@@ -1,11 +1,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.Shortapps" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- OS 26 Palette: Dark Glass -->
-        <item name="colorPrimary">#0A84FF</item> <!-- iOS Blue -->
-        <item name="colorPrimaryVariant">#0055AA</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">#BF5AF2</item> <!-- iOS Purple -->
-        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorPrimary">@color/colorPrimary</item> <!-- iOS Blue -->
+        <item name="colorPrimaryVariant">@color/colorPrimaryVariant</item>
+        <item name="colorOnPrimary">@color/colorOnPrimary</item>
+        <item name="colorSecondary">@color/colorSecondary</item> <!-- iOS Purple -->
+        <item name="colorOnSecondary">@color/colorOnSecondary</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>

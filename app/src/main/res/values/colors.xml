@@ -8,7 +8,14 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     
-    <!-- Material 3 Inspired Colors -->
+    <!-- App Theme Colors (iOS 26 Style) -->
+    <color name="colorPrimary">#0A84FF</color>
+    <color name="colorPrimaryVariant">#0055AA</color>
+    <color name="colorSecondary">#BF5AF2</color>
+    <color name="colorOnPrimary">#FFFFFF</color>
+    <color name="colorOnSecondary">#FFFFFF</color>
+
+    <!-- Material 3 Inspired Colors (Legacy/Fallback) -->
     <color name="md_theme_dark_primary">#D0BCFF</color>
     <color name="md_theme_dark_onPrimary">#381E72</color>
     <color name="md_theme_dark_primaryContainer">#4F378B</color>
