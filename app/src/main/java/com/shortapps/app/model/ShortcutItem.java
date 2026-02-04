@@ -3,6 +3,7 @@ package com.shortapps.app.model;
 public class ShortcutItem {
     public static final int TYPE_APP = 0;
     public static final int TYPE_TASKER = 1;
+    public static final int TYPE_SHORTCUT = 2; // Generic Android Shortcut
 
     public static final int MODE_ICON = 0;
     public static final int MODE_COLOR_BLOCK = 1;
@@ -11,7 +12,7 @@ public class ShortcutItem {
     private int type;
     private String label;
     private String packageName; // For apps
-    private String intentUri;   // For generic intents
+    private String intentUri;   // For generic intents (Shortcuts)
     private String taskerTaskName; // For Tasker
     private int displayMode;
     private int colorInfo; // Store color integer for MODE_COLOR_BLOCK
@@ -27,12 +28,20 @@ public class ShortcutItem {
     public String getId() { return id; }
     public int getType() { return type; }
     public String getLabel() { return label; }
+    public void setLabel(String label) { this.label = label; }
+    
     public String getPackageName() { return packageName; }
     public void setPackageName(String packageName) { this.packageName = packageName; }
+    
     public String getTaskerTaskName() { return taskerTaskName; }
     public void setTaskerTaskName(String taskerTaskName) { this.taskerTaskName = taskerTaskName; }
+    
+    public String getIntentUri() { return intentUri; }
+    public void setIntentUri(String intentUri) { this.intentUri = intentUri; }
+    
     public int getDisplayMode() { return displayMode; }
     public void setDisplayMode(int displayMode) { this.displayMode = displayMode; }
+    
     public int getColorInfo() { return colorInfo; }
     public void setColorInfo(int colorInfo) { this.colorInfo = colorInfo; }
 }

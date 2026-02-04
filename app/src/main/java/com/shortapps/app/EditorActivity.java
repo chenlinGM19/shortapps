@@ -1,21 +1,24 @@
 package com.shortapps.app;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.ItemTouchHelper;
@@ -34,25 +37,30 @@ import java.util.Random;
 
 public class EditorActivity extends AppCompatActivity {
     
+    private static final int REQUEST_PICK_SHORTCUT = 1001;
+    private static final int REQUEST_CREATE_SHORTCUT = 1002;
+
     private WindowConfig config;
     private int configIndex;
     private List<WindowConfig> allConfigs;
     
-    private EditText etName;
+    private EditText etName, etTriggerColor;
+    private View viewTriggerColorPreview;
     private SwitchMaterial switchNotification, switchTrigger;
-    private SeekBar sbColumns, sbTriggerSize, sbTriggerRadius;
-    private TextView tvColumns, tvTriggerSize, tvTriggerRadius;
+    private SeekBar sbColumns, sbTriggerWidth, sbTriggerHeight, sbTriggerRadius;
+    private TextView tvColumns, tvTriggerWidth, tvTriggerHeight, tvTriggerRadius;
     private View layoutTriggerSettings;
     
     private RecyclerView recyclerItems;
     private ItemAdapter itemAdapter;
+    
+    private ShortcutItem pendingEditingItem = null; // Used when picking a shortcut to update an existing item
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_editor);
         
-        // Setup Toolbar
         androidx.appcompat.widget.Toolbar toolbar = findViewById(R.id.toolbar);
         toolbar.setNavigationOnClickListener(v -> finish());
         
@@ -85,15 +93,35 @@ public class EditorActivity extends AppCompatActivity {
         layoutTriggerSettings = findViewById(R.id.layoutTriggerSettings);
         layoutTriggerSettings.setVisibility(config.isTriggerEnabled() ? View.VISIBLE : View.GONE);
         
-        tvTriggerSize = findViewById(R.id.tvTriggerSize);
-        sbTriggerSize = findViewById(R.id.sbTriggerSize);
-        sbTriggerSize.setProgress(config.getTriggerSize());
-        tvTriggerSize.setText("Size: " + config.getTriggerSize() + "dp");
+        tvTriggerWidth = findViewById(R.id.tvTriggerWidth);
+        sbTriggerWidth = findViewById(R.id.sbTriggerWidth);
+        sbTriggerWidth.setProgress(config.getTriggerWidth());
+        tvTriggerWidth.setText("Width: " + config.getTriggerWidth() + "dp");
+
+        tvTriggerHeight = findViewById(R.id.tvTriggerHeight);
+        sbTriggerHeight = findViewById(R.id.sbTriggerHeight);
+        sbTriggerHeight.setProgress(config.getTriggerHeight());
+        tvTriggerHeight.setText("Height: " + config.getTriggerHeight() + "dp");
         
         tvTriggerRadius = findViewById(R.id.tvTriggerRadius);
         sbTriggerRadius = findViewById(R.id.sbTriggerRadius);
         sbTriggerRadius.setProgress(config.getTriggerRadius());
         tvTriggerRadius.setText("Corner Radius: " + config.getTriggerRadius() + "dp");
+        
+        etTriggerColor = findViewById(R.id.etTriggerColor);
+        viewTriggerColorPreview = findViewById(R.id.viewTriggerColorPreview);
+        String hex = String.format("#%08X", (0xFFFFFFFF & config.getTriggerColor()));
+        etTriggerColor.setText(hex);
+        updateColorPreview(config.getTriggerColor());
+    }
+    
+    private void updateColorPreview(int color) {
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.RECTANGLE);
+        d.setCornerRadius(12);
+        d.setColor(color);
+        d.setStroke(2, Color.WHITE);
+        viewTriggerColorPreview.setBackground(d);
     }
     
     private void setupListeners() {
@@ -107,9 +135,14 @@ public class EditorActivity extends AppCompatActivity {
             layoutTriggerSettings.setVisibility(checked ? View.VISIBLE : View.GONE);
         });
         
-        sbTriggerSize.setOnSeekBarChangeListener(new SimpleSeekBarListener(val -> {
-            config.setTriggerSize(val);
-            tvTriggerSize.setText("Size: " + val + "dp");
+        sbTriggerWidth.setOnSeekBarChangeListener(new SimpleSeekBarListener(val -> {
+            config.setTriggerWidth(val);
+            tvTriggerWidth.setText("Width: " + val + "dp");
+        }));
+
+        sbTriggerHeight.setOnSeekBarChangeListener(new SimpleSeekBarListener(val -> {
+            config.setTriggerHeight(val);
+            tvTriggerHeight.setText("Height: " + val + "dp");
         }));
         
         sbTriggerRadius.setOnSeekBarChangeListener(new SimpleSeekBarListener(val -> {
@@ -117,8 +150,20 @@ public class EditorActivity extends AppCompatActivity {
             tvTriggerRadius.setText("Corner Radius: " + val + "dp");
         }));
         
-        findViewById(R.id.btnAddApp).setOnClickListener(v -> showAppPicker());
-        findViewById(R.id.btnAddTask).setOnClickListener(v -> addTaskerTask());
+        etTriggerColor.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                try {
+                    int c = Color.parseColor(s.toString());
+                    config.setTriggerColor(c);
+                    updateColorPreview(c);
+                } catch (Exception e) {}
+            }
+        });
+        
+        findViewById(R.id.btnAddApp).setOnClickListener(v -> showAppPicker(null));
+        findViewById(R.id.btnAddShortcut).setOnClickListener(v -> showShortcutTypeDialog(null));
         findViewById(R.id.btnSave).setOnClickListener(v -> save());
     }
     
@@ -158,7 +203,6 @@ public class EditorActivity extends AppCompatActivity {
         allConfigs.set(configIndex, config);
         ConfigManager.saveWindows(this, allConfigs);
         
-        // Restart service
         Intent i = new Intent(this, OverlayService.class);
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             startForegroundService(i);
@@ -168,9 +212,9 @@ public class EditorActivity extends AppCompatActivity {
         finish();
     }
     
-    // --- Helper Methods ---
+    // --- Logic: Add/Edit Items ---
     
-    private void showAppPicker() {
+    private void showAppPicker(@Nullable ShortcutItem editingItem) {
         PackageManager pm = getPackageManager();
         List<ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
         List<String> names = new ArrayList<>();
@@ -184,38 +228,109 @@ public class EditorActivity extends AppCompatActivity {
         }
         
         new AlertDialog.Builder(this)
-            .setTitle("Select App")
+            .setTitle(editingItem == null ? "Select App" : "Change App")
             .setItems(names.toArray(new String[0]), (dialog, which) -> {
                 ApplicationInfo selected = validApps.get(which);
-                ShortcutItem item = new ShortcutItem(
-                    java.util.UUID.randomUUID().toString(),
-                    ShortcutItem.TYPE_APP,
-                    names.get(which)
-                );
+                
+                ShortcutItem item = editingItem;
+                if (item == null) {
+                    item = new ShortcutItem(java.util.UUID.randomUUID().toString(), ShortcutItem.TYPE_APP, names.get(which));
+                } else {
+                    item.setLabel(names.get(which));
+                }
                 item.setPackageName(selected.packageName);
-                askDisplayMode(item);
+                
+                if (editingItem == null) {
+                    askDisplayMode(item);
+                } else {
+                    itemAdapter.notifyDataSetChanged();
+                }
             })
             .show();
     }
     
-    private void addTaskerTask() {
+    private void showShortcutTypeDialog(@Nullable ShortcutItem editingItem) {
+        String[] options = {"Tasker Task", "System Shortcut"};
+        new AlertDialog.Builder(this)
+            .setTitle("Select Type")
+            .setItems(options, (d, which) -> {
+                if (which == 0) {
+                    showTaskerDialog(editingItem);
+                } else {
+                    launchSystemShortcutPicker(editingItem);
+                }
+            })
+            .show();
+    }
+
+    private void showTaskerDialog(@Nullable ShortcutItem editingItem) {
         EditText input = new EditText(this);
         input.setHint("Task Name");
+        if (editingItem != null) input.setText(editingItem.getTaskerTaskName());
+        
         new AlertDialog.Builder(this)
             .setTitle("Enter Tasker Task Name")
             .setView(input)
-            .setPositiveButton("Add", (d, w) -> {
-                ShortcutItem item = new ShortcutItem(
-                    java.util.UUID.randomUUID().toString(),
-                    ShortcutItem.TYPE_TASKER,
-                    input.getText().toString()
-                );
-                item.setTaskerTaskName(input.getText().toString());
-                askDisplayMode(item);
+            .setPositiveButton("OK", (d, w) -> {
+                ShortcutItem item = editingItem;
+                String taskName = input.getText().toString();
+                if (item == null) {
+                    item = new ShortcutItem(java.util.UUID.randomUUID().toString(), ShortcutItem.TYPE_TASKER, taskName);
+                } else {
+                    item.setLabel(taskName);
+                }
+                item.setTaskerTaskName(taskName);
+                
+                if (editingItem == null) {
+                    askDisplayMode(item);
+                } else {
+                    itemAdapter.notifyDataSetChanged();
+                }
             })
             .show();
     }
     
+    private void launchSystemShortcutPicker(@Nullable ShortcutItem editingItem) {
+        this.pendingEditingItem = editingItem;
+        Intent pickIntent = new Intent(Intent.ACTION_PICK_ACTIVITY);
+        pickIntent.putExtra(Intent.EXTRA_INTENT, new Intent(Intent.ACTION_CREATE_SHORTCUT));
+        pickIntent.putExtra(Intent.EXTRA_TITLE, "Select Shortcut");
+        startActivityForResult(pickIntent, REQUEST_PICK_SHORTCUT);
+    }
+    
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != Activity.RESULT_OK) return;
+        
+        if (requestCode == REQUEST_PICK_SHORTCUT && data != null) {
+            // User selected an activity that creates shortcuts. Now launch it.
+            startActivityForResult(data, REQUEST_CREATE_SHORTCUT);
+        }
+        else if (requestCode == REQUEST_CREATE_SHORTCUT && data != null) {
+            // The activity returned the shortcut intent
+            Intent shortcutIntent = data.getParcelableExtra(Intent.EXTRA_SHORTCUT_INTENT);
+            String name = data.getStringExtra(Intent.EXTRA_SHORTCUT_NAME);
+            
+            if (shortcutIntent != null) {
+                ShortcutItem item = pendingEditingItem;
+                if (item == null) {
+                    item = new ShortcutItem(java.util.UUID.randomUUID().toString(), ShortcutItem.TYPE_SHORTCUT, name);
+                } else {
+                    item.setLabel(name);
+                }
+                item.setIntentUri(shortcutIntent.toUri(0));
+                
+                if (pendingEditingItem == null) {
+                    askDisplayMode(item);
+                } else {
+                    itemAdapter.notifyDataSetChanged();
+                }
+            }
+            pendingEditingItem = null;
+        }
+    }
+
     private void askDisplayMode(ShortcutItem item) {
         String[] options = {"Original Icon", "Colored Block"};
         new AlertDialog.Builder(this)
@@ -240,7 +355,7 @@ public class EditorActivity extends AppCompatActivity {
         return Color.HSVToColor(hsv);
     }
     
-    // --- Inner Classes ---
+    // --- Adapters ---
     
     private interface OnProgress { void onP(int v); }
     private static class SimpleSeekBarListener implements SeekBar.OnSeekBarChangeListener {
@@ -253,22 +368,31 @@ public class EditorActivity extends AppCompatActivity {
     
     private class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.Holder> {
         @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_transaction, parent, false); // Reusing layout
+            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_transaction, parent, false); 
             return new Holder(v);
         }
 
         @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
             ShortcutItem item = config.getItems().get(position);
             holder.tvName.setText(item.getLabel());
-            holder.tvInfo.setText(item.getType() == ShortcutItem.TYPE_APP ? "App" : "Tasker");
+            String typeStr = "App";
+            if (item.getType() == ShortcutItem.TYPE_TASKER) typeStr = "Tasker";
+            if (item.getType() == ShortcutItem.TYPE_SHORTCUT) typeStr = "Shortcut";
+            holder.tvInfo.setText(typeStr);
             
-            // Visual indicator of mode
             if(item.getDisplayMode() == ShortcutItem.MODE_COLOR_BLOCK) {
                 holder.colorIndicator.setVisibility(View.VISIBLE);
                 holder.colorIndicator.setBackgroundColor(item.getColorInfo());
             } else {
                 holder.colorIndicator.setVisibility(View.GONE);
             }
+            
+            holder.itemView.setOnClickListener(v -> {
+                // Edit Logic
+                if (item.getType() == ShortcutItem.TYPE_APP) showAppPicker(item);
+                else if (item.getType() == ShortcutItem.TYPE_TASKER) showTaskerDialog(item);
+                else if (item.getType() == ShortcutItem.TYPE_SHORTCUT) launchSystemShortcutPicker(item);
+            });
         }
 
         @Override public int getItemCount() { return config.getItems().size(); }
@@ -278,11 +402,10 @@ public class EditorActivity extends AppCompatActivity {
             View colorIndicator;
             Holder(View v) {
                 super(v);
-                tvName = v.findViewById(R.id.tvDelta); // Reusing ID
-                tvInfo = v.findViewById(R.id.tvDate); // Reusing ID
+                tvName = v.findViewById(R.id.tvDelta);
+                tvInfo = v.findViewById(R.id.tvDate);
                 colorIndicator = new View(v.getContext());
                 
-                // Add color indicator dynamically since reusing layout
                 ViewGroup vg = (ViewGroup) v;
                 vg.addView(colorIndicator, 0);
                 colorIndicator.getLayoutParams().width = 50;

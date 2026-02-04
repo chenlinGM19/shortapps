@@ -1,5 +1,7 @@
 package com.shortapps.app;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -10,6 +12,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
@@ -35,7 +38,7 @@ import com.shortapps.app.model.ShortcutItem;
 import com.shortapps.app.model.WindowConfig;
 import com.shortapps.app.utils.ConfigManager;
 
-import java.util.ArrayList;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,20 +55,17 @@ public class OverlayService extends Service {
     private Map<String, View> activeTriggers = new HashMap<>();
     private Map<String, WindowManager.LayoutParams> triggerParamsMap = new HashMap<>();
     
-    // Map ConfigID -> WindowView
+    // Map ConfigID -> Window Container View
     private Map<String, View> activeWindows = new HashMap<>();
     
     private List<WindowConfig> configs;
-    
     private int screenWidth;
-    private int screenHeight;
 
     @Override
     public void onCreate() {
         super.onCreate();
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         screenWidth = getResources().getDisplayMetrics().widthPixels;
-        screenHeight = getResources().getDisplayMetrics().heightPixels;
         
         configs = ConfigManager.loadWindows(this);
         
@@ -73,7 +73,6 @@ public class OverlayService extends Service {
         
         refreshTriggers();
         
-        // Register receiver for internal actions
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_TOGGLE_WINDOW);
         filter.addAction(ACTION_SHOW_WINDOW);
@@ -91,11 +90,9 @@ public class OverlayService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null) {
-            // If service is restarted (e.g. from Editor), reload configs
             configs = ConfigManager.loadWindows(this);
             refreshTriggers();
-            updateNotification(); // Refresh notification actions
-            
+            updateNotification();
             handleIntent(intent);
         }
         return START_STICKY;
@@ -129,7 +126,6 @@ public class OverlayService extends Service {
     // --- Trigger Logic ---
     
     private void refreshTriggers() {
-        // Remove existing triggers that are no longer valid or need update
         for (String id : activeTriggers.keySet()) {
             if (activeTriggers.get(id) != null) {
                 try {
@@ -148,21 +144,21 @@ public class OverlayService extends Service {
     }
     
     private void addTrigger(WindowConfig config) {
-        int sizePx = (int) (config.getTriggerSize() * getResources().getDisplayMetrics().density);
+        int widthPx = (int) (config.getTriggerWidth() * getResources().getDisplayMetrics().density);
+        int heightPx = (int) (config.getTriggerHeight() * getResources().getDisplayMetrics().density);
         int radiusPx = (int) (config.getTriggerRadius() * getResources().getDisplayMetrics().density);
         
         View trigger = new View(this);
         
-        // Dynamic Shape
         GradientDrawable shape = new GradientDrawable();
         shape.setShape(GradientDrawable.RECTANGLE);
         shape.setCornerRadius(radiusPx);
-        shape.setColor(0x99000000); // Transparent black
-        shape.setStroke(2, 0x66FFFFFF); // White border
+        shape.setColor(config.getTriggerColor());
+        shape.setStroke(2, 0x66FFFFFF); 
         trigger.setBackground(shape);
         
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                sizePx, sizePx,
+                widthPx, heightPx,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
@@ -241,10 +237,9 @@ public class OverlayService extends Service {
                 windowManager.updateViewLayout(view, params);
             } catch (Exception e) {}
         });
-        anim.addListener(new android.animation.AnimatorListenerAdapter() {
+        anim.addListener(new AnimatorListenerAdapter() {
             @Override
-            public void onAnimationEnd(android.animation.Animator animation) {
-                // Save position
+            public void onAnimationEnd(Animator animation) {
                 config.setTriggerX(params.x);
                 config.setTriggerY(params.y);
                 saveConfigState(); 
@@ -270,58 +265,85 @@ public class OverlayService extends Service {
     private void showWindow(WindowConfig config) {
         if (activeWindows.containsKey(config.getId())) return;
         
-        // Container
-        FrameLayout container = new FrameLayout(this);
-        container.setBackgroundResource(R.drawable.bg_glass_panel);
-        container.setPadding(20, 20, 20, 20);
+        // Root Container (Catch Outside Touches)
+        FrameLayout rootContainer = new FrameLayout(this);
+        rootContainer.setOnClickListener(v -> hideWindow(config)); // Close on click outside
         
-        // RecyclerView
+        // Actual Window Content
+        FrameLayout contentFrame = new FrameLayout(this);
+        contentFrame.setBackgroundResource(R.drawable.bg_glass_panel);
+        contentFrame.setPadding(20, 20, 20, 20);
+        contentFrame.setClickable(true); // Prevent clicks passing through to root
+        
         RecyclerView rv = new RecyclerView(this);
         rv.setLayoutManager(new GridLayoutManager(this, config.getColumns()));
-        rv.setAdapter(new ShortcutAdapter(config.getItems()));
-        container.addView(rv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        rv.setAdapter(new ShortcutAdapter(config.getItems(), config));
+        contentFrame.addView(rv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         
+        FrameLayout.LayoutParams frameParams = new FrameLayout.LayoutParams(
+            (int) (320 * getResources().getDisplayMetrics().density), 
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        frameParams.gravity = Gravity.CENTER;
+        rootContainer.addView(contentFrame, frameParams);
+        
+        // Window Manager Params (Match Parent to catch all touches)
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                (int) (300 * getResources().getDisplayMetrics().density), 
-                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_DIM_BEHIND,
+                // Removed FLAG_NOT_FOCUSABLE so we catch touches. 
+                // Added FLAG_LAYOUT_IN_SCREEN to cover everything.
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_DIM_BEHIND,
                 PixelFormat.TRANSLUCENT
         );
-        params.dimAmount = 0.3f;
-        params.gravity = Gravity.CENTER;
+        params.dimAmount = 0.4f;
         
-        // Tap outside to close? 
-        // We can add a touch listener to the container. But FLAG_NOT_FOCUSABLE makes outside touches pass through.
-        // For now, toggle again to close.
+        windowManager.addView(rootContainer, params);
         
-        windowManager.addView(container, params);
+        // Optimized Animation
+        contentFrame.setAlpha(0f);
+        contentFrame.setScaleX(0.9f);
+        contentFrame.setScaleY(0.9f);
         
-        // Animation
-        container.setScaleX(0.5f);
-        container.setScaleY(0.5f);
-        container.setAlpha(0f);
-        container.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(250).setInterpolator(new OvershootInterpolator()).start();
+        contentFrame.animate()
+            .scaleX(1f).scaleY(1f).alpha(1f)
+            .setDuration(200)
+            .setInterpolator(new OvershootInterpolator(0.8f))
+            .start();
         
-        activeWindows.put(config.getId(), container);
+        activeWindows.put(config.getId(), rootContainer);
     }
     
     private void hideWindow(WindowConfig config) {
-        View v = activeWindows.remove(config.getId());
-        if (v != null) {
-            v.animate().scaleX(0.8f).scaleY(0.8f).alpha(0f).setDuration(200).withEndAction(() -> {
-                try {
-                    windowManager.removeView(v);
-                } catch (Exception e) {}
-            }).start();
+        View root = activeWindows.remove(config.getId());
+        if (root != null) {
+            // Find content view to animate
+            View content = ((ViewGroup)root).getChildAt(0);
+            if (content != null) {
+                content.animate()
+                    .scaleX(0.9f).scaleY(0.9f).alpha(0f)
+                    .setDuration(150)
+                    .withEndAction(() -> {
+                        try {
+                            windowManager.removeView(root);
+                        } catch (Exception e) {}
+                    }).start();
+            } else {
+                 try { windowManager.removeView(root); } catch (Exception e) {}
+            }
         }
     }
 
     // --- Adapter ---
     private class ShortcutAdapter extends RecyclerView.Adapter<ShortcutAdapter.Holder> {
         List<ShortcutItem> items;
+        WindowConfig parentConfig;
         
-        ShortcutAdapter(List<ShortcutItem> items) { this.items = items; }
+        ShortcutAdapter(List<ShortcutItem> items, WindowConfig parentConfig) { 
+            this.items = items; 
+            this.parentConfig = parentConfig;
+        }
 
         @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             FrameLayout v = new FrameLayout(parent.getContext());
@@ -340,11 +362,12 @@ public class OverlayService extends Service {
             FrameLayout root;
             ImageView icon;
             View colorBlock;
+            TextView label;
             
             Holder(View v) { 
                 super(v); 
                 root = (FrameLayout) v;
-                int pad = 10;
+                int pad = 12;
                 root.setPadding(pad, pad, pad, pad);
                 
                 icon = new ImageView(OverlayService.this);
@@ -353,10 +376,22 @@ public class OverlayService extends Service {
                 colorBlock = new View(OverlayService.this);
                 colorBlock.setBackgroundResource(R.drawable.bg_glass_panel); 
                 root.addView(colorBlock, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                
+                label = new TextView(OverlayService.this);
+                label.setTextSize(10);
+                label.setTextColor(Color.WHITE);
+                label.setGravity(Gravity.CENTER);
+                label.setShadowLayer(2, 1, 1, Color.BLACK);
+                label.setMaxLines(1);
+                label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                lp.gravity = Gravity.BOTTOM;
+                root.addView(label, lp);
             }
             
             void bind(ShortcutItem item) {
                 root.setOnClickListener(v -> executeItem(item));
+                label.setText(item.getLabel());
                 
                 if (item.getDisplayMode() == ShortcutItem.MODE_COLOR_BLOCK) {
                     icon.setVisibility(View.GONE);
@@ -374,7 +409,7 @@ public class OverlayService extends Service {
                             Drawable d = getPackageManager().getApplicationIcon(item.getPackageName());
                             icon.setImageDrawable(d);
                         } else {
-                            icon.setImageResource(android.R.drawable.ic_menu_agenda);
+                            icon.setImageResource(android.R.drawable.ic_menu_compass);
                             icon.setColorFilter(Color.WHITE);
                         }
                     } catch (Exception e) {
@@ -386,19 +421,31 @@ public class OverlayService extends Service {
     }
     
     private void executeItem(ShortcutItem item) {
-        if (item.getType() == ShortcutItem.TYPE_APP) {
-            Intent launch = getPackageManager().getLaunchIntentForPackage(item.getPackageName());
-            if (launch != null) {
-                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(launch);
+        try {
+            if (item.getType() == ShortcutItem.TYPE_APP) {
+                Intent launch = getPackageManager().getLaunchIntentForPackage(item.getPackageName());
+                if (launch != null) {
+                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(launch);
+                }
+            } else if (item.getType() == ShortcutItem.TYPE_TASKER) {
+                Intent b = new Intent("net.dinglisch.android.tasker.ACTION_TASK");
+                b.putExtra("task_name", item.getTaskerTaskName());
+                sendBroadcast(b);
+            } else if (item.getType() == ShortcutItem.TYPE_SHORTCUT) {
+                 Intent i = Intent.parseUri(item.getIntentUri(), 0);
+                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                 startActivity(i);
             }
-        } else if (item.getType() == ShortcutItem.TYPE_TASKER) {
-            Intent b = new Intent("net.dinglisch.android.tasker.ACTION_TASK");
-            b.putExtra("task_name", item.getTaskerTaskName());
-            sendBroadcast(b);
-            
-            // Auto close window after task launch? 
-            // Intent i = new Intent(ACTION_HIDE_WINDOW);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        // Auto Close window after launch
+        for (WindowConfig c : configs) {
+            if (activeWindows.containsKey(c.getId())) {
+                hideWindow(c);
+            }
         }
     }
 
@@ -406,12 +453,13 @@ public class OverlayService extends Service {
         String chId = "overlay_service";
         NotificationManager nm = getSystemService(NotificationManager.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel ch = new NotificationChannel(chId, "Overlay", NotificationManager.IMPORTANCE_LOW);
+            NotificationChannel ch = new NotificationChannel(chId, "Shortapps Overlay", NotificationManager.IMPORTANCE_LOW);
+            ch.setShowBadge(false);
             nm.createNotificationChannel(ch);
         }
         
         RemoteViews rv = new RemoteViews(getPackageName(), R.layout.notification_control);
-        rv.removeAllViews(R.id.notif_container); // Clear previous
+        rv.removeAllViews(R.id.notif_container);
         
         for (WindowConfig c : configs) {
             if (c.isEnabledInNotification()) {
@@ -422,14 +470,27 @@ public class OverlayService extends Service {
                 i.setAction(ACTION_TOGGLE_WINDOW);
                 i.putExtra("window_name", c.getName());
                 
-                btn.setOnClickPendingIntent(R.id.btnWindow, PendingIntent.getBroadcast(this, c.getId().hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+                // CRITICAL: Use unique RequestCode (hashCode) to ensure PendingIntents don't overwrite each other
+                PendingIntent pi = PendingIntent.getBroadcast(
+                    this, 
+                    c.getName().hashCode(), 
+                    i, 
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+                
+                btn.setOnClickPendingIntent(R.id.btnWindow, pi);
                 rv.addView(R.id.notif_container, btn);
             }
         }
         
+        // Main intent to open app
+        Intent mainIntent = new Intent(this, MainActivity.class);
+        PendingIntent mainPi = PendingIntent.getActivity(this, 0, mainIntent, PendingIntent.FLAG_IMMUTABLE);
+        
         return new NotificationCompat.Builder(this, chId)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setCustomContentView(rv)
+                .setContentIntent(mainPi)
                 .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)

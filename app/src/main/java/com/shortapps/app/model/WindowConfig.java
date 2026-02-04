@@ -1,5 +1,6 @@
 package com.shortapps.app.model;
 
+import android.graphics.Color;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -16,10 +17,15 @@ public class WindowConfig {
     
     // Trigger Button Settings
     private boolean triggerEnabled;
-    private int triggerSize; // dp
+    private int triggerWidth;  // dp
+    private int triggerHeight; // dp
     private int triggerRadius; // dp
+    private int triggerColor;  // ARGB
     private int triggerX;
     private int triggerY;
+
+    // Legacy support field
+    private int triggerSize; 
 
     public WindowConfig(String name) {
         this.id = UUID.randomUUID().toString();
@@ -31,8 +37,10 @@ public class WindowConfig {
         // Defaults
         this.enabledInNotification = true;
         this.triggerEnabled = true;
-        this.triggerSize = 60;
-        this.triggerRadius = 30; // Circle by default
+        this.triggerWidth = 60;
+        this.triggerHeight = 60;
+        this.triggerRadius = 30;
+        this.triggerColor = Color.parseColor("#99000000"); // Transparent Black
         this.triggerX = 0;
         this.triggerY = 300;
     }
@@ -56,11 +64,23 @@ public class WindowConfig {
     public boolean isTriggerEnabled() { return triggerEnabled; }
     public void setTriggerEnabled(boolean triggerEnabled) { this.triggerEnabled = triggerEnabled; }
     
-    public int getTriggerSize() { return triggerSize; }
-    public void setTriggerSize(int triggerSize) { this.triggerSize = triggerSize; }
+    public int getTriggerWidth() { 
+        return triggerWidth > 0 ? triggerWidth : (triggerSize > 0 ? triggerSize : 60); 
+    }
+    public void setTriggerWidth(int triggerWidth) { this.triggerWidth = triggerWidth; }
+
+    public int getTriggerHeight() { 
+        return triggerHeight > 0 ? triggerHeight : (triggerSize > 0 ? triggerSize : 60); 
+    }
+    public void setTriggerHeight(int triggerHeight) { this.triggerHeight = triggerHeight; }
     
     public int getTriggerRadius() { return triggerRadius; }
     public void setTriggerRadius(int triggerRadius) { this.triggerRadius = triggerRadius; }
+
+    public int getTriggerColor() { 
+        return triggerColor != 0 ? triggerColor : Color.parseColor("#99000000");
+    }
+    public void setTriggerColor(int triggerColor) { this.triggerColor = triggerColor; }
     
     public int getTriggerX() { return triggerX; }
     public void setTriggerX(int triggerX) { this.triggerX = triggerX; }

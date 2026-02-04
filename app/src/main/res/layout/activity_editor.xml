@@ -16,7 +16,7 @@
             android:layout_height="?attr/actionBarSize"
             app:title="Edit Window"
             app:titleTextColor="#FFFFFF"
-            app:navigationIcon="@drawable/ic_settings"/> <!-- reusing existing icon as back placeholder or logic -->
+            app:navigationIcon="@drawable/ic_settings"/>
     </com.google.android.material.appbar.AppBarLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -104,40 +104,91 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
+                <!-- Width -->
                 <TextView
-                    android:id="@+id/tvTriggerSize"
+                    android:id="@+id/tvTriggerWidth"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Size: 60dp"
+                    android:text="Width: 60dp"
                     android:textColor="#FFFFFF"
                     android:layout_marginTop="12dp"/>
                 <SeekBar
-                    android:id="@+id/sbTriggerSize"
+                    android:id="@+id/sbTriggerWidth"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="100"
-                    android:min="30"
+                    android:max="200"
+                    android:min="20"
                     android:progress="60"
                     android:progressTint="#BF5AF2"
-                    android:thumbTint="#BF5AF2"
-                    android:layout_marginTop="4dp"/>
+                    android:thumbTint="#BF5AF2"/>
 
+                <!-- Height -->
+                <TextView
+                    android:id="@+id/tvTriggerHeight"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Height: 60dp"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginTop="8dp"/>
+                <SeekBar
+                    android:id="@+id/sbTriggerHeight"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="200"
+                    android:min="20"
+                    android:progress="60"
+                    android:progressTint="#BF5AF2"
+                    android:thumbTint="#BF5AF2"/>
+
+                <!-- Radius -->
                 <TextView
                     android:id="@+id/tvTriggerRadius"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Corner Radius: 30dp"
                     android:textColor="#FFFFFF"
-                    android:layout_marginTop="12dp"/>
+                    android:layout_marginTop="8dp"/>
                 <SeekBar
                     android:id="@+id/sbTriggerRadius"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="50"
+                    android:max="100"
                     android:progress="30"
                     android:progressTint="#BF5AF2"
-                    android:thumbTint="#BF5AF2"
-                    android:layout_marginTop="4dp"/>
+                    android:thumbTint="#BF5AF2"/>
+                    
+                <!-- Color Input -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Color (Hex ARGB)"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginTop="8dp"/>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="4dp">
+                    
+                    <View
+                        android:id="@+id/viewTriggerColorPreview"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_trigger_button"
+                        android:layout_marginEnd="12dp"/>
+
+                    <EditText
+                        android:id="@+id/etTriggerColor"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="#99000000"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#666666"
+                        android:inputType="textNoSuggestions"/>
+                </LinearLayout>
+
             </LinearLayout>
 
             <!-- Items Section -->
@@ -166,12 +217,12 @@
                     app:strokeColor="#333333"
                     android:layout_marginEnd="8dp"/>
                 <Button
-                    android:id="@+id/btnAddTask"
+                    android:id="@+id/btnAddShortcut"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="+ Tasker"
+                    android:text="+ Shortcut/Task"
                     android:textColor="#FFFFFF"
                     app:strokeColor="#333333"/>
             </LinearLayout>
@@ -188,7 +239,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Drag to reorder, swipe to delete"
+                android:text="Tap to edit, Drag to reorder, Swipe to delete"
                 android:gravity="center"
                 android:textColor="#666666"
                 android:textSize="12sp"
