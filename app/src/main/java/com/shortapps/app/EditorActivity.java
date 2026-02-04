@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.Editable;
@@ -12,8 +13,10 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -36,6 +39,7 @@ import com.shortapps.app.view.ColorWheelView;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
@@ -325,37 +329,87 @@ public class EditorActivity extends AppCompatActivity {
     
     // --- Logic: Add/Edit Items ---
     
+    private static class AppInfoWrapper {
+        ApplicationInfo info;
+        String label;
+        
+        AppInfoWrapper(ApplicationInfo info, PackageManager pm) {
+            this.info = info;
+            this.label = pm.getApplicationLabel(info).toString();
+        }
+    }
+
     private void showAppPicker(@Nullable ShortcutItem editingItem) {
         PackageManager pm = getPackageManager();
         List<ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
-        List<String> names = new ArrayList<>();
-        List<ApplicationInfo> validApps = new ArrayList<>();
+        List<AppInfoWrapper> validApps = new ArrayList<>();
         
         for (ApplicationInfo app : apps) {
             if (pm.getLaunchIntentForPackage(app.packageName) != null) {
-                validApps.add(app);
-                names.add(pm.getApplicationLabel(app).toString());
+                validApps.add(new AppInfoWrapper(app, pm));
             }
         }
         
-        new AlertDialog.Builder(this)
-            .setTitle(editingItem == null ? "Select App" : "Change App")
-            .setItems(names.toArray(new String[0]), (dialog, which) -> {
-                ApplicationInfo selected = validApps.get(which);
-                
-                ShortcutItem item = editingItem;
-                if (item == null) {
-                    item = new ShortcutItem(java.util.UUID.randomUUID().toString(), ShortcutItem.TYPE_APP, names.get(which));
-                } else {
-                    item.setLabel(names.get(which));
+        Collections.sort(validApps, (a, b) -> a.label.compareToIgnoreCase(b.label));
+        
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_app_picker, null);
+        RecyclerView rv = dialogView.findViewById(R.id.recyclerApps);
+        rv.setLayoutManager(new LinearLayoutManager(this));
+        
+        AppPickerAdapter adapter = new AppPickerAdapter(validApps, editingItem != null, pm);
+        if (editingItem != null) {
+            // Find current item to check it? Can be added later if needed.
+        }
+        rv.setAdapter(adapter);
+        
+        AlertDialog dialog = new AlertDialog.Builder(this)
+            .setTitle(editingItem == null ? "Select Apps" : "Change App")
+            .setView(dialogView)
+            .setPositiveButton(editingItem == null ? "Add Selected" : "Save", null)
+            .setNegativeButton("Cancel", null)
+            .create();
+            
+        dialog.setOnShowListener(d -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                List<AppInfoWrapper> selected = adapter.getSelected();
+                if (selected.isEmpty()) {
+                    Toast.makeText(this, "Please select at least one app", Toast.LENGTH_SHORT).show();
+                    return;
                 }
-                item.setPackageName(selected.packageName);
                 
-                if (editingItem == null) {
-                    askDisplayMode(item);
-                } else {
+                dialog.dismiss();
+                
+                if (editingItem != null) {
+                    // Single edit
+                    AppInfoWrapper app = selected.get(0);
+                    editingItem.setLabel(app.label);
+                    editingItem.setPackageName(app.info.packageName);
                     itemAdapter.notifyDataSetChanged();
+                } else {
+                    // Multi add
+                    processSelectedApps(selected);
                 }
+            });
+        });
+        
+        dialog.show();
+    }
+    
+    private void processSelectedApps(List<AppInfoWrapper> apps) {
+        String[] options = {"Original Icon", "Colored Block"};
+        new AlertDialog.Builder(this)
+            .setTitle("Display Mode")
+            .setItems(options, (d, which) -> {
+                for(AppInfoWrapper app : apps) {
+                    ShortcutItem item = new ShortcutItem(java.util.UUID.randomUUID().toString(), ShortcutItem.TYPE_APP, app.label);
+                    item.setPackageName(app.info.packageName);
+                    item.setDisplayMode(which);
+                    if (which == ShortcutItem.MODE_COLOR_BLOCK) {
+                        item.setColorInfo(generateUniqueColor());
+                    }
+                    config.getItems().add(item);
+                }
+                itemAdapter.notifyDataSetChanged();
             })
             .show();
     }
@@ -473,6 +527,62 @@ public class EditorActivity extends AppCompatActivity {
         @Override public void onProgressChanged(SeekBar s, int p, boolean u) { op.onP(p); }
         @Override public void onStartTrackingTouch(SeekBar s) {}
         @Override public void onStopTrackingTouch(SeekBar s) {}
+    }
+    
+    private class AppPickerAdapter extends RecyclerView.Adapter<AppPickerAdapter.VH> {
+        List<AppInfoWrapper> list;
+        boolean singleSelection;
+        PackageManager pm;
+        List<AppInfoWrapper> selected = new ArrayList<>();
+        
+        AppPickerAdapter(List<AppInfoWrapper> list, boolean singleSelection, PackageManager pm) {
+            this.list = list;
+            this.singleSelection = singleSelection;
+            this.pm = pm;
+        }
+        
+        List<AppInfoWrapper> getSelected() { return selected; }
+        
+        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_app_selection, parent, false));
+        }
+        
+        @Override public void onBindViewHolder(@NonNull VH holder, int position) {
+            AppInfoWrapper item = list.get(position);
+            holder.tv.setText(item.label);
+            holder.icon.setImageDrawable(item.info.loadIcon(pm));
+            
+            boolean isSelected = selected.contains(item);
+            holder.cb.setChecked(isSelected);
+            
+            holder.itemView.setOnClickListener(v -> {
+                if (singleSelection) {
+                    selected.clear();
+                    selected.add(item);
+                    notifyDataSetChanged();
+                } else {
+                    if (selected.contains(item)) selected.remove(item);
+                    else selected.add(item);
+                    notifyItemChanged(position);
+                }
+            });
+            // Also toggle on checkbox click
+            holder.cb.setOnClickListener(v -> holder.itemView.performClick());
+        }
+        
+        @Override public int getItemCount() { return list.size(); }
+        
+        class VH extends RecyclerView.ViewHolder {
+            TextView tv;
+            ImageView icon;
+            CheckBox cb;
+            VH(View v) {
+                super(v);
+                tv = v.findViewById(R.id.tvLabel);
+                icon = v.findViewById(R.id.imgIcon);
+                cb = v.findViewById(R.id.cbSelect);
+            }
+        }
     }
     
     private class ItemAdapter extends RecyclerView.Adapter<ItemAdapter.Holder> {
