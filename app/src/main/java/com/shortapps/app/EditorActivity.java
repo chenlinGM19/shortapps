@@ -26,6 +26,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -354,13 +355,25 @@ public class EditorActivity extends AppCompatActivity {
         
         View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_app_picker, null);
         RecyclerView rv = dialogView.findViewById(R.id.recyclerApps);
-        rv.setLayoutManager(new LinearLayoutManager(this));
+        EditText etSearch = dialogView.findViewById(R.id.etSearch);
+        
+        // Change to Grid Layout with 6 columns
+        rv.setLayoutManager(new GridLayoutManager(this, 6));
         
         AppPickerAdapter adapter = new AppPickerAdapter(validApps, editingItem != null, pm);
         if (editingItem != null) {
             // Find current item to check it? Can be added later if needed.
         }
         rv.setAdapter(adapter);
+        
+        // Search Logic
+        etSearch.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                adapter.filter(s.toString());
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
         
         AlertDialog dialog = new AlertDialog.Builder(this)
             .setTitle(editingItem == null ? "Select Apps" : "Change App")
@@ -530,25 +543,42 @@ public class EditorActivity extends AppCompatActivity {
     }
     
     private class AppPickerAdapter extends RecyclerView.Adapter<AppPickerAdapter.VH> {
-        List<AppInfoWrapper> list;
+        List<AppInfoWrapper> originalList;
+        List<AppInfoWrapper> displayList;
         boolean singleSelection;
         PackageManager pm;
         List<AppInfoWrapper> selected = new ArrayList<>();
         
         AppPickerAdapter(List<AppInfoWrapper> list, boolean singleSelection, PackageManager pm) {
-            this.list = list;
+            this.originalList = list;
+            this.displayList = new ArrayList<>(list);
             this.singleSelection = singleSelection;
             this.pm = pm;
         }
         
         List<AppInfoWrapper> getSelected() { return selected; }
         
+        public void filter(String query) {
+            displayList.clear();
+            if (query.isEmpty()) {
+                displayList.addAll(originalList);
+            } else {
+                String q = query.toLowerCase();
+                for (AppInfoWrapper app : originalList) {
+                    if (app.label.toLowerCase().contains(q)) {
+                        displayList.add(app);
+                    }
+                }
+            }
+            notifyDataSetChanged();
+        }
+        
         @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             return new VH(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_app_selection, parent, false));
         }
         
         @Override public void onBindViewHolder(@NonNull VH holder, int position) {
-            AppInfoWrapper item = list.get(position);
+            AppInfoWrapper item = displayList.get(position);
             holder.tv.setText(item.label);
             holder.icon.setImageDrawable(item.info.loadIcon(pm));
             
@@ -570,7 +600,7 @@ public class EditorActivity extends AppCompatActivity {
             holder.cb.setOnClickListener(v -> holder.itemView.performClick());
         }
         
-        @Override public int getItemCount() { return list.size(); }
+        @Override public int getItemCount() { return displayList.size(); }
         
         class VH extends RecyclerView.ViewHolder {
             TextView tv;
