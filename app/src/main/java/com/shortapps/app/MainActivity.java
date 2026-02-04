@@ -8,155 +8,117 @@ import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.shortapps.app.model.WindowConfig;
+import com.shortapps.app.utils.ConfigManager;
 
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    private RecyclerView recyclerWindows;
+    private RecyclerView rv;
+    private List<WindowConfig> configs;
     private WindowAdapter adapter;
-    private List<DataModel.WindowConfig> windows;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         setContentView(R.layout.activity_main);
 
-        checkOverlayPermission();
+        checkPermissions();
 
-        recyclerWindows = findViewById(R.id.recyclerWindows);
-        recyclerWindows.setLayoutManager(new LinearLayoutManager(this));
-        
-        SeekBar seekPillSize = findViewById(R.id.seekPillSize);
-        seekPillSize.setProgress(DataManager.getPillSize(this));
-        seekPillSize.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {}
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                int val = Math.max(30, seekBar.getProgress());
-                DataManager.savePillSize(MainActivity.this, val);
-                restartService();
-            }
-        });
+        rv = findViewById(R.id.recyclerView);
+        rv.setLayoutManager(new LinearLayoutManager(this));
 
-        findViewById(R.id.btnNewWindow).setOnClickListener(v -> {
-            DataModel.WindowConfig newWindow = new DataModel.WindowConfig("New Window " + (windows.size() + 1));
-            windows.add(newWindow);
-            DataManager.saveWindows(this, windows);
-            loadData();
-            // Open editor immediately
-            openEditor(newWindow.id);
+        FloatingActionButton fab = findViewById(R.id.fabAdd);
+        fab.setOnClickListener(v -> {
+            WindowConfig newConfig = new WindowConfig("New Window " + (configs.size() + 1));
+            configs.add(newConfig);
+            save();
+            adapter.notifyItemInserted(configs.size() - 1);
         });
         
-        findViewById(R.id.btnStartService).setOnClickListener(v -> restartService());
+        startService();
     }
-
+    
     @Override
     protected void onResume() {
         super.onResume();
         loadData();
     }
-
+    
     private void loadData() {
-        windows = DataManager.loadWindows(this);
-        adapter = new WindowAdapter(windows);
-        recyclerWindows.setAdapter(adapter);
+        configs = ConfigManager.loadWindows(this);
+        adapter = new WindowAdapter();
+        rv.setAdapter(adapter);
     }
     
-    private void openEditor(String id) {
-        Intent i = new Intent(this, WindowEditorActivity.class);
-        i.putExtra("window_id", id);
-        startActivity(i);
+    private void save() {
+        ConfigManager.saveWindows(this, configs);
+        // Restart service to pick up changes
+        startService();
     }
     
-    private void restartService() {
-        if (!Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "Permission required", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Intent intent = new Intent(this, OverlayService.class);
-        stopService(intent);
+    private void startService() {
+        Intent i = new Intent(this, OverlayService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent);
+            startForegroundService(i);
         } else {
-            startService(intent);
+            startService(i);
         }
-        Toast.makeText(this, "Service Updated", Toast.LENGTH_SHORT).show();
     }
 
-    private void checkOverlayPermission() {
+    private void checkPermissions() {
         if (!Settings.canDrawOverlays(this)) {
-            new AlertDialog.Builder(this)
-                .setTitle("Permission Required")
-                .setMessage("Shortapps needs 'Display over other apps' to function.")
-                .setPositiveButton("Grant", (d, w) -> {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
-                })
-                .show();
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName()));
+            startActivityForResult(intent, 101);
         }
     }
-
+    
     class WindowAdapter extends RecyclerView.Adapter<WindowAdapter.Holder> {
-        List<DataModel.WindowConfig> list;
-
-        public WindowAdapter(List<DataModel.WindowConfig> list) { this.list = list; }
-
-        @NonNull @Override
-        public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new Holder(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_window_config, parent, false));
+        @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_window_config, parent, false);
+            return new Holder(v);
         }
 
-        @Override
-        public void onBindViewHolder(@NonNull Holder holder, int position) {
-            DataModel.WindowConfig item = list.get(position);
-            holder.tvName.setText(item.name);
-            holder.tvCount.setText(item.items.size() + " Shortcuts");
-            holder.swNotif.setChecked(item.showInNotification);
+        @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
+            WindowConfig c = configs.get(position);
+            holder.tvName.setText(c.getName());
+            holder.tvInfo.setText(c.getItems().size() + " Items | " + c.getColumns() + " Cols");
             
-            holder.itemView.setOnClickListener(v -> openEditor(item.id));
-            
-            holder.swNotif.setOnCheckedChangeListener((btn, checked) -> {
-                item.showInNotification = checked;
-                DataManager.saveWindows(MainActivity.this, list);
-                restartService(); // Refresh notification
+            holder.itemView.setOnClickListener(v -> {
+                Intent i = new Intent(MainActivity.this, EditorActivity.class);
+                i.putExtra("window_index", position);
+                startActivity(i);
             });
             
-            holder.btnDelete.setOnClickListener(v -> {
-                list.remove(position);
-                DataManager.saveWindows(MainActivity.this, list);
+            holder.itemView.setOnLongClickListener(v -> {
+                configs.remove(position);
+                save();
                 notifyItemRemoved(position);
+                return true;
             });
         }
 
-        @Override public int getItemCount() { return list.size(); }
-
+        @Override public int getItemCount() { return configs.size(); }
+        
         class Holder extends RecyclerView.ViewHolder {
-            TextView tvName, tvCount;
-            SwitchMaterial swNotif;
-            View btnDelete;
-            public Holder(@NonNull View itemView) {
-                super(itemView);
-                tvName = itemView.findViewById(R.id.tvName);
-                tvCount = itemView.findViewById(R.id.tvCount);
-                swNotif = itemView.findViewById(R.id.swNotif);
-                btnDelete = itemView.findViewById(R.id.btnDelete);
+            TextView tvName, tvInfo;
+            Holder(View v) {
+                super(v);
+                tvName = v.findViewById(R.id.tvName);
+                tvInfo = v.findViewById(R.id.tvInfo);
             }
         }
     }

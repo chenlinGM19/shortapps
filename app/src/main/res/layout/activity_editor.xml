@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#000000"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Edit Window"
+        android:textColor="#FFFFFF"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"/>
+
+    <EditText
+        android:id="@+id/etName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Window Name"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#666666"
+        android:backgroundTint="@color/colorPrimary"/>
+
+    <TextView
+        android:id="@+id/tvColumns"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Columns: 4"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="24dp"/>
+
+    <SeekBar
+        android:id="@+id/sbColumns"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="8"
+        android:progress="4"
+        android:layout_marginTop="8dp"/>
+
+    <TextView
+        android:id="@+id/tvItemCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Items: 0"
+        android:textColor="#AAAAAA"
+        android:layout_marginTop="24dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp">
+        
+        <Button
+            android:id="@+id/btnAddApp"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Add App"
+            android:layout_marginEnd="8dp"/>
+            
+        <Button
+            android:id="@+id/btnAddTask"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Add Task"/>
+    </LinearLayout>
+    
+    <View android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+    
+    <Button
+        android:id="@+id/btnSave"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Save &amp; Apply"
+        android:backgroundTint="@color/colorPrimary"
+        android:textColor="#FFFFFF"/>
+
+</LinearLayout>

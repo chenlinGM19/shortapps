@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">Time Currency</string>
+    <string name="app_name">Shortapps</string>
+    <string name="service_notif_channel">Overlay Service</string>
+    <string name="service_notif_title">Shortapps Running</string>
+    <string name="permission_overlay_title">Overlay Permission Required</string>
+    <string name="permission_overlay_desc">To display floating windows, please grant "Display over other apps" permission.</string>
 </resources>
