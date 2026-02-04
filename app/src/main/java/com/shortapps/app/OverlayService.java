@@ -10,7 +10,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
@@ -36,6 +35,7 @@ import com.shortapps.app.model.ShortcutItem;
 import com.shortapps.app.model.WindowConfig;
 import com.shortapps.app.utils.ConfigManager;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,11 +47,14 @@ public class OverlayService extends Service {
     public static final String ACTION_HIDE_WINDOW = "com.shortapps.app.ACTION_HIDE_WINDOW";
     
     private WindowManager windowManager;
-    private View triggerButton;
-    private WindowManager.LayoutParams triggerParams;
     
-    // Map Window ID -> View
+    // Map ConfigID -> TriggerView
+    private Map<String, View> activeTriggers = new HashMap<>();
+    private Map<String, WindowManager.LayoutParams> triggerParamsMap = new HashMap<>();
+    
+    // Map ConfigID -> WindowView
     private Map<String, View> activeWindows = new HashMap<>();
+    
     private List<WindowConfig> configs;
     
     private int screenWidth;
@@ -68,7 +71,7 @@ public class OverlayService extends Service {
         
         startForeground(1001, createNotification());
         
-        setupTriggerButton();
+        refreshTriggers();
         
         // Register receiver for internal actions
         IntentFilter filter = new IntentFilter();
@@ -88,6 +91,11 @@ public class OverlayService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null) {
+            // If service is restarted (e.g. from Editor), reload configs
+            configs = ConfigManager.loadWindows(this);
+            refreshTriggers();
+            updateNotification(); // Refresh notification actions
+            
             handleIntent(intent);
         }
         return START_STICKY;
@@ -118,82 +126,135 @@ public class OverlayService extends Service {
         }
     }
 
-    // --- Trigger Button Logic ---
-    private void setupTriggerButton() {
-        int size = ConfigManager.loadTriggerSize(this);
-        int sizePx = (int) (size * getResources().getDisplayMetrics().density);
+    // --- Trigger Logic ---
+    
+    private void refreshTriggers() {
+        // Remove existing triggers that are no longer valid or need update
+        for (String id : activeTriggers.keySet()) {
+            if (activeTriggers.get(id) != null) {
+                try {
+                    windowManager.removeView(activeTriggers.get(id));
+                } catch (Exception e) {}
+            }
+        }
+        activeTriggers.clear();
+        triggerParamsMap.clear();
         
-        triggerButton = new View(this);
-        triggerButton.setBackgroundResource(R.drawable.bg_trigger_button);
+        for (WindowConfig c : configs) {
+            if (c.isTriggerEnabled()) {
+                addTrigger(c);
+            }
+        }
+    }
+    
+    private void addTrigger(WindowConfig config) {
+        int sizePx = (int) (config.getTriggerSize() * getResources().getDisplayMetrics().density);
+        int radiusPx = (int) (config.getTriggerRadius() * getResources().getDisplayMetrics().density);
         
-        triggerParams = new WindowManager.LayoutParams(
+        View trigger = new View(this);
+        
+        // Dynamic Shape
+        GradientDrawable shape = new GradientDrawable();
+        shape.setShape(GradientDrawable.RECTANGLE);
+        shape.setCornerRadius(radiusPx);
+        shape.setColor(0x99000000); // Transparent black
+        shape.setStroke(2, 0x66FFFFFF); // White border
+        trigger.setBackground(shape);
+        
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 sizePx, sizePx,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
         );
-        triggerParams.gravity = Gravity.TOP | Gravity.START;
-        triggerParams.x = screenWidth; // Start right
-        triggerParams.y = screenHeight / 2;
+        params.gravity = Gravity.TOP | Gravity.START;
+        params.x = config.getTriggerX();
+        params.y = config.getTriggerY();
         
-        triggerButton.setOnTouchListener(new View.OnTouchListener() {
-            private int initialX, initialY;
-            private float initialTouchX, initialTouchY;
-            private boolean isDrag = false;
-
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        initialX = triggerParams.x;
-                        initialY = triggerParams.y;
-                        initialTouchX = event.getRawX();
-                        initialTouchY = event.getRawY();
-                        isDrag = false;
-                        triggerButton.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100).start();
-                        return true;
-                        
-                    case MotionEvent.ACTION_MOVE:
-                        if (Math.abs(event.getRawX() - initialTouchX) > 20 || Math.abs(event.getRawY() - initialTouchY) > 20) {
-                            isDrag = true;
-                        }
-                        triggerParams.x = initialX + (int) (event.getRawX() - initialTouchX);
-                        triggerParams.y = initialY + (int) (event.getRawY() - initialTouchY);
-                        windowManager.updateViewLayout(triggerButton, triggerParams);
-                        return true;
-                        
-                    case MotionEvent.ACTION_UP:
-                        triggerButton.animate().scaleX(1f).scaleY(1f).setDuration(100).start();
-                        if (!isDrag) {
-                            // Clicked: Open first window or specific menu?
-                            // For MVP, toggle the first configured window
-                            if (!configs.isEmpty()) toggleWindow(configs.get(0));
-                        } else {
-                            snapToEdge();
-                        }
-                        return true;
-                }
-                return false;
-            }
-        });
+        trigger.setOnTouchListener(new TriggerTouchListener(config, params, trigger));
         
-        windowManager.addView(triggerButton, triggerParams);
+        windowManager.addView(trigger, params);
+        activeTriggers.put(config.getId(), trigger);
+        triggerParamsMap.put(config.getId(), params);
     }
     
-    private void snapToEdge() {
+    private class TriggerTouchListener implements View.OnTouchListener {
+        private WindowConfig config;
+        private WindowManager.LayoutParams params;
+        private View view;
+        private int initialX, initialY;
+        private float initialTouchX, initialTouchY;
+        private boolean isDrag = false;
+
+        TriggerTouchListener(WindowConfig config, WindowManager.LayoutParams params, View view) {
+            this.config = config;
+            this.params = params;
+            this.view = view;
+        }
+
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    initialX = params.x;
+                    initialY = params.y;
+                    initialTouchX = event.getRawX();
+                    initialTouchY = event.getRawY();
+                    isDrag = false;
+                    view.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100).start();
+                    return true;
+                    
+                case MotionEvent.ACTION_MOVE:
+                    if (Math.abs(event.getRawX() - initialTouchX) > 20 || Math.abs(event.getRawY() - initialTouchY) > 20) {
+                        isDrag = true;
+                    }
+                    params.x = initialX + (int) (event.getRawX() - initialTouchX);
+                    params.y = initialY + (int) (event.getRawY() - initialTouchY);
+                    try {
+                        windowManager.updateViewLayout(view, params);
+                    } catch (Exception e) {}
+                    return true;
+                    
+                case MotionEvent.ACTION_UP:
+                    view.animate().scaleX(1f).scaleY(1f).setDuration(100).start();
+                    if (!isDrag) {
+                        toggleWindow(config);
+                    } else {
+                        snapToEdge(params, view, config);
+                    }
+                    return true;
+            }
+            return false;
+        }
+    }
+    
+    private void snapToEdge(WindowManager.LayoutParams params, View view, WindowConfig config) {
         int mid = screenWidth / 2;
-        int targetX = (triggerParams.x > mid) ? screenWidth - triggerButton.getWidth() : 0;
+        int targetX = (params.x > mid) ? screenWidth - view.getWidth() : 0;
         
-        ValueAnimator anim = ValueAnimator.ofInt(triggerParams.x, targetX);
+        ValueAnimator anim = ValueAnimator.ofInt(params.x, targetX);
         anim.setDuration(300);
         anim.setInterpolator(new OvershootInterpolator());
         anim.addUpdateListener(animation -> {
-            triggerParams.x = (int) animation.getAnimatedValue();
+            params.x = (int) animation.getAnimatedValue();
             try {
-                windowManager.updateViewLayout(triggerButton, triggerParams);
+                windowManager.updateViewLayout(view, params);
             } catch (Exception e) {}
         });
+        anim.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator animation) {
+                // Save position
+                config.setTriggerX(params.x);
+                config.setTriggerY(params.y);
+                saveConfigState(); 
+            }
+        });
         anim.start();
+    }
+    
+    private void saveConfigState() {
+        ConfigManager.saveWindows(this, configs);
     }
     
     // --- Window Logic ---
@@ -221,21 +282,22 @@ public class OverlayService extends Service {
         container.addView(rv, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                (int) (300 * getResources().getDisplayMetrics().density), // Fixed width or dynamic
+                (int) (300 * getResources().getDisplayMetrics().density), 
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_DIM_BEHIND,
                 PixelFormat.TRANSLUCENT
         );
-        params.dimAmount = 0.3f; // Glass feel
+        params.dimAmount = 0.3f;
         params.gravity = Gravity.CENTER;
         
-        // Allow close on outside touch? Hard with FLAG_NOT_FOCUSABLE. 
-        // We implement a close button inside or rely on toggle.
+        // Tap outside to close? 
+        // We can add a touch listener to the container. But FLAG_NOT_FOCUSABLE makes outside touches pass through.
+        // For now, toggle again to close.
         
         windowManager.addView(container, params);
         
-        // Animate In
+        // Animation
         container.setScaleX(0.5f);
         container.setScaleY(0.5f);
         container.setAlpha(0f);
@@ -263,7 +325,6 @@ public class OverlayService extends Service {
 
         @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             FrameLayout v = new FrameLayout(parent.getContext());
-            int size = (int) (50 * getResources().getDisplayMetrics().density); // Use config size later
             v.setLayoutParams(new ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 150));
             return new Holder(v);
         }
@@ -290,7 +351,7 @@ public class OverlayService extends Service {
                 root.addView(icon, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 
                 colorBlock = new View(OverlayService.this);
-                colorBlock.setBackgroundResource(R.drawable.bg_glass_panel); // Reuse shape
+                colorBlock.setBackgroundResource(R.drawable.bg_glass_panel); 
                 root.addView(colorBlock, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             }
             
@@ -313,7 +374,7 @@ public class OverlayService extends Service {
                             Drawable d = getPackageManager().getApplicationIcon(item.getPackageName());
                             icon.setImageDrawable(d);
                         } else {
-                            icon.setImageResource(android.R.drawable.ic_menu_agenda); // Placeholder for Tasker
+                            icon.setImageResource(android.R.drawable.ic_menu_agenda);
                             icon.setColorFilter(Color.WHITE);
                         }
                     } catch (Exception e) {
@@ -332,14 +393,12 @@ public class OverlayService extends Service {
                 startActivity(launch);
             }
         } else if (item.getType() == ShortcutItem.TYPE_TASKER) {
-            // Notify Tasker via Broadcast
             Intent b = new Intent("net.dinglisch.android.tasker.ACTION_TASK");
             b.putExtra("task_name", item.getTaskerTaskName());
             sendBroadcast(b);
             
-            // Also notify ourselves (optional feedback)
-            Intent i = new Intent(ACTION_HIDE_WINDOW); // Close window on action?
-            // sendBroadcast(i); 
+            // Auto close window after task launch? 
+            // Intent i = new Intent(ACTION_HIDE_WINDOW);
         }
     }
 
@@ -352,21 +411,40 @@ public class OverlayService extends Service {
         }
         
         RemoteViews rv = new RemoteViews(getPackageName(), R.layout.notification_control);
-        // Dynamically add buttons for each window config
-        // Simplification for XML output: just one generic view
+        rv.removeAllViews(R.id.notif_container); // Clear previous
+        
+        for (WindowConfig c : configs) {
+            if (c.isEnabledInNotification()) {
+                RemoteViews btn = new RemoteViews(getPackageName(), R.layout.item_notif_button);
+                btn.setTextViewText(R.id.btnWindow, c.getName());
+                
+                Intent i = new Intent(this, TaskerReceiver.class);
+                i.setAction(ACTION_TOGGLE_WINDOW);
+                i.putExtra("window_name", c.getName());
+                
+                btn.setOnClickPendingIntent(R.id.btnWindow, PendingIntent.getBroadcast(this, c.getId().hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+                rv.addView(R.id.notif_container, btn);
+            }
+        }
         
         return new NotificationCompat.Builder(this, chId)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setCustomContentView(rv)
                 .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
                 .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
                 .build();
+    }
+    
+    private void updateNotification() {
+        NotificationManager nm = getSystemService(NotificationManager.class);
+        nm.notify(1001, createNotification());
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (triggerButton != null) windowManager.removeView(triggerButton);
+        for (View v : activeTriggers.values()) windowManager.removeView(v);
         for (View v : activeWindows.values()) windowManager.removeView(v);
         unregisterReceiver(internalReceiver);
     }
