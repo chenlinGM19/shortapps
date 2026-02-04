@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/md_theme_dark_background"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            app:title="Customize Icon"
+            app:titleTextColor="@color/md_theme_dark_secondary"
+            app:navigationIcon="@drawable/ic_minus"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- Card 1: System Icons -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            app:cardBackgroundColor="@color/md_theme_dark_surface"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="App Icon"
+                    android:textColor="@color/md_theme_dark_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Select the main app icon. The app will restart upon application."
+                    android:textColor="#AAAAAA"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="24dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false">
+
+                    <!-- Option 1: Default -->
+                    <LinearLayout
+                        android:id="@+id/layoutDefault"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackgroundBorderless">
+                        
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardDefault"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="@android:color/transparent"
+                            app:strokeWidth="0dp"
+                            app:strokeColor="@color/md_theme_dark_primary">
+                            <ImageView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:src="@drawable/myicon"
+                                android:scaleType="fitCenter"
+                                android:padding="8dp"/>
+                        </com.google.android.material.card.MaterialCardView>
+                        
+                        <TextView
+                            android:id="@+id/textDefault"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Default"
+                            android:textColor="@color/md_theme_dark_onSecondaryContainer"
+                            android:layout_marginTop="8dp"
+                            android:textSize="12sp"/>
+                    </LinearLayout>
+
+                    <!-- Option 2: Clock -->
+                    <LinearLayout
+                        android:id="@+id/layoutIcon1"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackgroundBorderless">
+                        
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardIcon1"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="@android:color/transparent"
+                            app:strokeWidth="0dp"
+                            app:strokeColor="@color/md_theme_dark_primary">
+                            <ImageView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:src="@drawable/myicon1"
+                                android:scaleType="fitCenter"
+                                android:padding="8dp"/>
+                        </com.google.android.material.card.MaterialCardView>
+                        
+                        <TextView
+                            android:id="@+id/textIcon1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Clock"
+                            android:textColor="@color/md_theme_dark_onSecondaryContainer"
+                            android:layout_marginTop="8dp"
+                            android:textSize="12sp"/>
+                    </LinearLayout>
+
+                    <!-- Option 3: Minimal -->
+                    <LinearLayout
+                        android:id="@+id/layoutIcon2"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackgroundBorderless">
+                        
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/cardIcon2"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="@android:color/transparent"
+                            app:strokeWidth="0dp"
+                            app:strokeColor="@color/md_theme_dark_primary">
+                            <ImageView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:src="@drawable/myicon2"
+                                android:scaleType="fitCenter"
+                                android:padding="8dp"/>
+                        </com.google.android.material.card.MaterialCardView>
+                        
+                        <TextView
+                            android:id="@+id/textIcon2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Minimal"
+                            android:textColor="@color/md_theme_dark_onSecondaryContainer"
+                            android:layout_marginTop="8dp"
+                            android:textSize="12sp"/>
+                    </LinearLayout>
+
+                </LinearLayout>
+                
+                <Button
+                    android:id="@+id/btnApplyIcon"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:text="Apply Icon"
+                    android:backgroundTint="@color/md_theme_dark_primaryContainer"
+                    android:textColor="@color/md_theme_dark_onPrimaryContainer"/>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Card 2: Custom Shortcut -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="32dp"
+            app:cardBackgroundColor="@color/md_theme_dark_surface"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Custom Shortcut"
+                    android:textColor="@color/md_theme_dark_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="8dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Create a shortcut on your home screen using any PNG image."
+                    android:textColor="#AAAAAA"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="24dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="24dp">
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        app:cardCornerRadius="18dp"
+                        app:cardElevation="0dp"
+                        app:cardBackgroundColor="#333333">
+                        <ImageView
+                            android:id="@+id/previewShortcut"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/ic_launcher_foreground"
+                            app:tint="#666666"/>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <Button
+                        android:id="@+id/btnSelectImage"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:text="Select Image"
+                        android:textColor="@color/md_theme_dark_secondary"
+                        app:strokeColor="@color/md_theme_dark_secondary"/>
+
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnAddShortcut"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Add to Home Screen"
+                    android:backgroundTint="@color/md_theme_dark_secondaryContainer"
+                    android:textColor="@color/md_theme_dark_onSecondaryContainer"
+                    android:enabled="false"/>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

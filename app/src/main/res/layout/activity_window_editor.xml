@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Edit Window"
+        android:textSize="24sp"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="24dp"/>
+
+    <EditText
+        android:id="@+id/etWindowName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Window Name"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#666666"
+        android:backgroundTint="#0A84FF"
+        android:layout_marginBottom="16dp"/>
+        
+    <EditText
+        android:id="@+id/etColumns"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Columns (e.g. 4)"
+        android:inputType="number"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#666666"
+        android:backgroundTint="#0A84FF"
+        android:layout_marginBottom="24dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp">
+        
+        <Button
+            android:id="@+id/btnAddApp"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Add App"
+            android:layout_marginEnd="8dp"/>
+            
+        <Button
+            android:id="@+id/btnAddTasker"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Add Task"/>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerShortcuts"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/bg_glass_panel"
+        android:padding="8dp"/>
+
+    <Button
+        android:id="@+id/btnSave"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Save Window"
+        android:backgroundTint="#30D158"
+        android:layout_marginTop="16dp"/>
+
+</LinearLayout>

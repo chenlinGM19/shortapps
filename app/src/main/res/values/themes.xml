@@ -1,0 +1,17 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Shortapps" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#0A84FF</item> <!-- iOS Blue -->
+        <item name="colorPrimaryVariant">#0056b3</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#5E5CE6</item> <!-- iOS Indigo -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#000000</item>
+    </style>
+    
+    <style name="GlassPanel">
+        <item name="android:background">@drawable/bg_glass_panel</item>
+        <item name="android:elevation">0dp</item>
+    </style>
+</resources>
