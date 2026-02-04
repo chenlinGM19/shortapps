@@ -15,6 +15,9 @@ public class WindowConfig {
     // Notification Settings
     private boolean enabledInNotification;
     
+    // Window Settings
+    private boolean showLabels;
+    
     // Trigger Button Settings
     private boolean triggerEnabled;
     private int triggerWidth;  // dp
@@ -37,6 +40,7 @@ public class WindowConfig {
         
         // Defaults
         this.enabledInNotification = true;
+        this.showLabels = true;
         this.triggerEnabled = true;
         this.triggerWidth = 60;
         this.triggerHeight = 60;
@@ -62,6 +66,9 @@ public class WindowConfig {
     
     public boolean isEnabledInNotification() { return enabledInNotification; }
     public void setEnabledInNotification(boolean enabledInNotification) { this.enabledInNotification = enabledInNotification; }
+    
+    public boolean isShowLabels() { return showLabels; }
+    public void setShowLabels(boolean showLabels) { this.showLabels = showLabels; }
     
     public boolean isTriggerEnabled() { return triggerEnabled; }
     public void setTriggerEnabled(boolean triggerEnabled) { this.triggerEnabled = triggerEnabled; }

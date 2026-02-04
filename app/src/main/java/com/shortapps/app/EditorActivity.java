@@ -13,6 +13,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,6 +31,7 @@ import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.shortapps.app.model.ShortcutItem;
 import com.shortapps.app.model.WindowConfig;
 import com.shortapps.app.utils.ConfigManager;
+import com.shortapps.app.view.ColorWheelView;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,9 +47,9 @@ public class EditorActivity extends AppCompatActivity {
     private int configIndex;
     private List<WindowConfig> allConfigs;
     
-    private EditText etName, etTriggerColor;
-    private View viewTriggerColorPreview;
-    private SwitchMaterial switchNotification, switchTrigger;
+    private EditText etName;
+    private View viewTriggerColorPreview, previewTrigger;
+    private SwitchMaterial switchNotification, switchTrigger, switchShowLabels;
     private SeekBar sbColumns, sbTriggerWidth, sbTriggerHeight, sbTriggerRadius;
     private TextView tvColumns, tvTriggerWidth, tvTriggerHeight, tvTriggerRadius;
     private MaterialButtonToggleGroup toggleTriggerStyle;
@@ -74,6 +76,7 @@ public class EditorActivity extends AppCompatActivity {
         bindViews();
         setupListeners();
         setupRecyclerView();
+        updatePreview();
     }
     
     private void bindViews() {
@@ -82,6 +85,9 @@ public class EditorActivity extends AppCompatActivity {
         
         switchNotification = findViewById(R.id.switchNotification);
         switchNotification.setChecked(config.isEnabledInNotification());
+        
+        switchShowLabels = findViewById(R.id.switchShowLabels);
+        switchShowLabels.setChecked(config.isShowLabels());
         
         tvColumns = findViewById(R.id.tvColumns);
         sbColumns = findViewById(R.id.sbColumns);
@@ -119,20 +125,55 @@ public class EditorActivity extends AppCompatActivity {
         sbTriggerRadius.setProgress(config.getTriggerRadius());
         tvTriggerRadius.setText("Corner Radius: " + config.getTriggerRadius() + "dp");
         
-        etTriggerColor = findViewById(R.id.etTriggerColor);
         viewTriggerColorPreview = findViewById(R.id.viewTriggerColorPreview);
-        String hex = String.format("#%08X", (0xFFFFFFFF & config.getTriggerColor()));
-        etTriggerColor.setText(hex);
+        previewTrigger = findViewById(R.id.previewTrigger);
+        
         updateColorPreview(config.getTriggerColor());
     }
     
     private void updateColorPreview(int color) {
-        GradientDrawable d = new GradientDrawable();
-        d.setShape(GradientDrawable.RECTANGLE);
-        d.setCornerRadius(12);
-        d.setColor(color);
-        d.setStroke(2, Color.WHITE);
-        viewTriggerColorPreview.setBackground(d);
+        viewTriggerColorPreview.setBackgroundColor(color);
+    }
+    
+    private void updatePreview() {
+        if (previewTrigger == null) return;
+        
+        int w = (int) (config.getTriggerWidth() * getResources().getDisplayMetrics().density);
+        int h = (int) (config.getTriggerHeight() * getResources().getDisplayMetrics().density);
+        
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) previewTrigger.getLayoutParams();
+        lp.width = w;
+        lp.height = h;
+        previewTrigger.setLayoutParams(lp);
+        
+        GradientDrawable shape = new GradientDrawable();
+        shape.setShape(GradientDrawable.RECTANGLE);
+        shape.setCornerRadius(config.getTriggerRadius() * getResources().getDisplayMetrics().density);
+        
+        int color = config.getTriggerColor();
+        int style = config.getTriggerStyle();
+        
+        switch (style) {
+            case 0: // Solid
+                shape.setColor(color);
+                break;
+            case 1: // Outline
+                shape.setColor(Color.TRANSPARENT);
+                shape.setStroke(4, color);
+                break;
+            case 2: // Glass
+                shape.setColor(Color.argb(80, Color.red(color), Color.green(color), Color.blue(color)));
+                shape.setStroke(2, Color.WHITE);
+                break;
+            case 3: // Inverted
+                shape.setColor(Color.WHITE);
+                shape.setStroke(4, color);
+                break;
+            default:
+                shape.setColor(color);
+        }
+        
+        previewTrigger.setBackground(shape);
     }
     
     private void setupListeners() {
@@ -140,6 +181,9 @@ public class EditorActivity extends AppCompatActivity {
              config.setColumns(val);
              tvColumns.setText("Columns: " + val);
         }));
+        
+        switchNotification.setOnCheckedChangeListener((btn, checked) -> config.setEnabledInNotification(checked));
+        switchShowLabels.setOnCheckedChangeListener((btn, checked) -> config.setShowLabels(checked));
         
         switchTrigger.setOnCheckedChangeListener((btn, checked) -> {
             config.setTriggerEnabled(checked);
@@ -152,39 +196,85 @@ public class EditorActivity extends AppCompatActivity {
                 else if (checkedId == R.id.btnStyle1) config.setTriggerStyle(1);
                 else if (checkedId == R.id.btnStyle2) config.setTriggerStyle(2);
                 else if (checkedId == R.id.btnStyle3) config.setTriggerStyle(3);
+                updatePreview();
             }
         });
         
         sbTriggerWidth.setOnSeekBarChangeListener(new SimpleSeekBarListener(val -> {
             config.setTriggerWidth(val);
             tvTriggerWidth.setText("Width: " + val + "dp");
+            updatePreview();
         }));
 
         sbTriggerHeight.setOnSeekBarChangeListener(new SimpleSeekBarListener(val -> {
             config.setTriggerHeight(val);
             tvTriggerHeight.setText("Height: " + val + "dp");
+            updatePreview();
         }));
         
         sbTriggerRadius.setOnSeekBarChangeListener(new SimpleSeekBarListener(val -> {
             config.setTriggerRadius(val);
             tvTriggerRadius.setText("Corner Radius: " + val + "dp");
+            updatePreview();
         }));
         
-        etTriggerColor.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override public void afterTextChanged(Editable s) {
-                try {
-                    int c = Color.parseColor(s.toString());
-                    config.setTriggerColor(c);
-                    updateColorPreview(c);
-                } catch (Exception e) {}
-            }
-        });
+        findViewById(R.id.btnPickColor).setOnClickListener(v -> showColorWheelDialog());
         
         findViewById(R.id.btnAddApp).setOnClickListener(v -> showAppPicker(null));
         findViewById(R.id.btnAddShortcut).setOnClickListener(v -> showShortcutTypeDialog(null));
         findViewById(R.id.btnSave).setOnClickListener(v -> save());
+    }
+    
+    private void showColorWheelDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Pick Color");
+        
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(40, 40, 40, 40);
+        
+        ColorWheelView wheel = new ColorWheelView(this);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 600);
+        container.addView(wheel, lp);
+        
+        // Alpha Slider
+        TextView labelAlpha = new TextView(this);
+        labelAlpha.setText("Transparency");
+        labelAlpha.setTextColor(Color.WHITE);
+        container.addView(labelAlpha);
+        
+        SeekBar alphaBar = new SeekBar(this);
+        alphaBar.setMax(255);
+        alphaBar.setProgress(Color.alpha(config.getTriggerColor()));
+        container.addView(alphaBar);
+
+        builder.setView(container);
+        
+        final int[] tempColor = {config.getTriggerColor()};
+        
+        wheel.setOnColorSelectedListener(color -> {
+            // Combine with alpha
+            int a = alphaBar.getProgress();
+            tempColor[0] = Color.argb(a, Color.red(color), Color.green(color), Color.blue(color));
+            config.setTriggerColor(tempColor[0]); // Update immediately for preview if desired, or wait for OK
+            updateColorPreview(tempColor[0]);
+            updatePreview();
+        });
+        
+        alphaBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
+                 int c = tempColor[0];
+                 tempColor[0] = Color.argb(p, Color.red(c), Color.green(c), Color.blue(c));
+                 config.setTriggerColor(tempColor[0]);
+                 updateColorPreview(tempColor[0]);
+                 updatePreview();
+            }
+            @Override public void onStartTrackingTouch(SeekBar s) {}
+            @Override public void onStopTrackingTouch(SeekBar s) {}
+        });
+        
+        builder.setPositiveButton("OK", null);
+        builder.show();
     }
     
     private void setupRecyclerView() {
@@ -324,11 +414,9 @@ public class EditorActivity extends AppCompatActivity {
         if (resultCode != Activity.RESULT_OK) return;
         
         if (requestCode == REQUEST_PICK_SHORTCUT && data != null) {
-            // User selected an activity that creates shortcuts. Now launch it.
             startActivityForResult(data, REQUEST_CREATE_SHORTCUT);
         }
         else if (requestCode == REQUEST_CREATE_SHORTCUT && data != null) {
-            // The activity returned the shortcut intent
             Intent shortcutIntent = data.getParcelableExtra(Intent.EXTRA_SHORTCUT_INTENT);
             String name = data.getStringExtra(Intent.EXTRA_SHORTCUT_NAME);
             
@@ -408,7 +496,6 @@ public class EditorActivity extends AppCompatActivity {
             }
             
             holder.itemView.setOnClickListener(v -> {
-                // Edit Logic
                 if (item.getType() == ShortcutItem.TYPE_APP) showAppPicker(item);
                 else if (item.getType() == ShortcutItem.TYPE_TASKER) showTaskerDialog(item);
                 else if (item.getType() == ShortcutItem.TYPE_SHORTCUT) launchSystemShortcutPicker(item);
