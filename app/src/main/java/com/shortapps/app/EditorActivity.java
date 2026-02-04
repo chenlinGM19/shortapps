@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.shortapps.app.model.ShortcutItem;
 import com.shortapps.app.model.WindowConfig;
@@ -49,12 +50,13 @@ public class EditorActivity extends AppCompatActivity {
     private SwitchMaterial switchNotification, switchTrigger;
     private SeekBar sbColumns, sbTriggerWidth, sbTriggerHeight, sbTriggerRadius;
     private TextView tvColumns, tvTriggerWidth, tvTriggerHeight, tvTriggerRadius;
+    private MaterialButtonToggleGroup toggleTriggerStyle;
     private View layoutTriggerSettings;
     
     private RecyclerView recyclerItems;
     private ItemAdapter itemAdapter;
     
-    private ShortcutItem pendingEditingItem = null; // Used when picking a shortcut to update an existing item
+    private ShortcutItem pendingEditingItem = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,6 +94,15 @@ public class EditorActivity extends AppCompatActivity {
         
         layoutTriggerSettings = findViewById(R.id.layoutTriggerSettings);
         layoutTriggerSettings.setVisibility(config.isTriggerEnabled() ? View.VISIBLE : View.GONE);
+        
+        toggleTriggerStyle = findViewById(R.id.toggleTriggerStyle);
+        int styleId = R.id.btnStyle0;
+        switch (config.getTriggerStyle()) {
+            case 1: styleId = R.id.btnStyle1; break;
+            case 2: styleId = R.id.btnStyle2; break;
+            case 3: styleId = R.id.btnStyle3; break;
+        }
+        toggleTriggerStyle.check(styleId);
         
         tvTriggerWidth = findViewById(R.id.tvTriggerWidth);
         sbTriggerWidth = findViewById(R.id.sbTriggerWidth);
@@ -133,6 +144,15 @@ public class EditorActivity extends AppCompatActivity {
         switchTrigger.setOnCheckedChangeListener((btn, checked) -> {
             config.setTriggerEnabled(checked);
             layoutTriggerSettings.setVisibility(checked ? View.VISIBLE : View.GONE);
+        });
+        
+        toggleTriggerStyle.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (isChecked) {
+                if (checkedId == R.id.btnStyle0) config.setTriggerStyle(0);
+                else if (checkedId == R.id.btnStyle1) config.setTriggerStyle(1);
+                else if (checkedId == R.id.btnStyle2) config.setTriggerStyle(2);
+                else if (checkedId == R.id.btnStyle3) config.setTriggerStyle(3);
+            }
         });
         
         sbTriggerWidth.setOnSeekBarChangeListener(new SimpleSeekBarListener(val -> {

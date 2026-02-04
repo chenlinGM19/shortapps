@@ -103,6 +103,56 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
+                
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Style"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="8dp"/>
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/toggleTriggerStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:singleSelection="true"
+                    app:selectionRequired="true"
+                    app:checkedButton="@+id/btnStyle0">
+                    
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnStyle0"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Solid"
+                        android:textColor="#FFFFFF"/>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnStyle1"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Line"
+                        android:textColor="#FFFFFF"/>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnStyle2"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Glass"
+                        android:textColor="#FFFFFF"/>
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnStyle3"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Inv"
+                        android:textColor="#FFFFFF"/>
+                </com.google.android.material.button.MaterialButtonToggleGroup>
 
                 <!-- Width -->
                 <TextView
@@ -116,8 +166,8 @@
                     android:id="@+id/sbTriggerWidth"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="200"
-                    android:min="20"
+                    android:max="300"
+                    android:min="1"
                     android:progress="60"
                     android:progressTint="#BF5AF2"
                     android:thumbTint="#BF5AF2"/>
@@ -134,8 +184,8 @@
                     android:id="@+id/sbTriggerHeight"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="200"
-                    android:min="20"
+                    android:max="300"
+                    android:min="1"
                     android:progress="60"
                     android:progressTint="#BF5AF2"
                     android:thumbTint="#BF5AF2"/>
@@ -152,7 +202,8 @@
                     android:id="@+id/sbTriggerRadius"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:max="100"
+                    android:max="150"
+                    android:min="0"
                     android:progress="30"
                     android:progressTint="#BF5AF2"
                     android:thumbTint="#BF5AF2"/>

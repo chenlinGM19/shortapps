@@ -21,6 +21,7 @@ public class WindowConfig {
     private int triggerHeight; // dp
     private int triggerRadius; // dp
     private int triggerColor;  // ARGB
+    private int triggerStyle;  // 0: Solid, 1: Outline, 2: Glass, 3: Inverted
     private int triggerX;
     private int triggerY;
 
@@ -41,6 +42,7 @@ public class WindowConfig {
         this.triggerHeight = 60;
         this.triggerRadius = 30;
         this.triggerColor = Color.parseColor("#99000000"); // Transparent Black
+        this.triggerStyle = 0;
         this.triggerX = 0;
         this.triggerY = 300;
     }
@@ -81,6 +83,9 @@ public class WindowConfig {
         return triggerColor != 0 ? triggerColor : Color.parseColor("#99000000");
     }
     public void setTriggerColor(int triggerColor) { this.triggerColor = triggerColor; }
+    
+    public int getTriggerStyle() { return triggerStyle; }
+    public void setTriggerStyle(int triggerStyle) { this.triggerStyle = triggerStyle; }
     
     public int getTriggerX() { return triggerX; }
     public void setTriggerX(int triggerX) { this.triggerX = triggerX; }

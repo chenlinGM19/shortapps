@@ -28,6 +28,7 @@ import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.RemoteViews;
+import android.widget.TextView; // Added import
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -153,8 +154,30 @@ public class OverlayService extends Service {
         GradientDrawable shape = new GradientDrawable();
         shape.setShape(GradientDrawable.RECTANGLE);
         shape.setCornerRadius(radiusPx);
-        shape.setColor(config.getTriggerColor());
-        shape.setStroke(2, 0x66FFFFFF); 
+        
+        int color = config.getTriggerColor();
+        int style = config.getTriggerStyle();
+        
+        switch (style) {
+            case 0: // Solid
+                shape.setColor(color);
+                break;
+            case 1: // Outline
+                shape.setColor(Color.TRANSPARENT);
+                shape.setStroke(4, color);
+                break;
+            case 2: // Glass (Force alpha)
+                shape.setColor(Color.argb(80, Color.red(color), Color.green(color), Color.blue(color)));
+                shape.setStroke(2, Color.WHITE);
+                break;
+            case 3: // Inverted
+                shape.setColor(Color.WHITE);
+                shape.setStroke(4, color);
+                break;
+            default:
+                shape.setColor(color);
+        }
+        
         trigger.setBackground(shape);
         
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
@@ -347,7 +370,8 @@ public class OverlayService extends Service {
 
         @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             FrameLayout v = new FrameLayout(parent.getContext());
-            v.setLayoutParams(new ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 150));
+            // Make height flexible based on content
+            v.setLayoutParams(new ViewGroup.MarginLayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             return new Holder(v);
         }
 
@@ -360,6 +384,7 @@ public class OverlayService extends Service {
         
         class Holder extends RecyclerView.ViewHolder {
             FrameLayout root;
+            FrameLayout contentWrapper;
             ImageView icon;
             View colorBlock;
             TextView label;
@@ -367,26 +392,37 @@ public class OverlayService extends Service {
             Holder(View v) { 
                 super(v); 
                 root = (FrameLayout) v;
-                int pad = 12;
+                root.setClickable(true);
+                root.setFocusable(true);
+                int pad = 8;
                 root.setPadding(pad, pad, pad, pad);
                 
+                // Create a container that will hold the Icon/ColorBlock
+                // This container is set to a fixed size (56dp) to simulate standard app icon size
+                int iconSizePx = (int) (56 * OverlayService.this.getResources().getDisplayMetrics().density);
+                contentWrapper = new FrameLayout(OverlayService.this);
+                FrameLayout.LayoutParams wrapperParams = new FrameLayout.LayoutParams(iconSizePx, iconSizePx);
+                wrapperParams.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
+                root.addView(contentWrapper, wrapperParams);
+
                 icon = new ImageView(OverlayService.this);
-                root.addView(icon, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                contentWrapper.addView(icon, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 
                 colorBlock = new View(OverlayService.this);
-                colorBlock.setBackgroundResource(R.drawable.bg_glass_panel); 
-                root.addView(colorBlock, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                contentWrapper.addView(colorBlock, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 
                 label = new TextView(OverlayService.this);
-                label.setTextSize(10);
+                label.setTextSize(12);
                 label.setTextColor(Color.WHITE);
                 label.setGravity(Gravity.CENTER);
                 label.setShadowLayer(2, 1, 1, Color.BLACK);
                 label.setMaxLines(1);
                 label.setEllipsize(android.text.TextUtils.TruncateAt.END);
-                FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                lp.gravity = Gravity.BOTTOM;
-                root.addView(label, lp);
+                
+                FrameLayout.LayoutParams labelParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                labelParams.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
+                labelParams.topMargin = iconSizePx + 4; // Position text below icon
+                root.addView(label, labelParams);
             }
             
             void bind(ShortcutItem item) {
@@ -398,7 +434,9 @@ public class OverlayService extends Service {
                     colorBlock.setVisibility(View.VISIBLE);
                     
                     GradientDrawable bg = new GradientDrawable();
-                    bg.setCornerRadius(30);
+                    // App icons usually have roughly 20-25% radius relative to size, or can be square
+                    // We'll use a moderate radius to look like an icon
+                    bg.setCornerRadius(30); 
                     bg.setColor(item.getColorInfo());
                     colorBlock.setBackground(bg);
                 } else {
