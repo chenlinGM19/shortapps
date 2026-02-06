@@ -41,8 +41,10 @@ import com.shortapps.app.view.ColorWheelView;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 public class EditorActivity extends AppCompatActivity {
     
@@ -56,8 +58,9 @@ public class EditorActivity extends AppCompatActivity {
     private EditText etName;
     private View viewTriggerColorPreview, previewTrigger;
     private SwitchMaterial switchNotification, switchTrigger, switchShowLabels;
-    private SeekBar sbColumns, sbTriggerWidth, sbTriggerHeight, sbTriggerRadius;
-    private TextView tvColumns, tvTriggerWidth, tvTriggerHeight, tvTriggerRadius;
+    private SeekBar sbColumns, sbTriggerWidth, sbTriggerHeight;
+    private SeekBar sbRadiusTL, sbRadiusTR, sbRadiusBL, sbRadiusBR;
+    private TextView tvColumns, tvTriggerWidth, tvTriggerHeight;
     private MaterialButtonToggleGroup toggleTriggerStyle;
     private View layoutTriggerSettings;
     
@@ -126,10 +129,15 @@ public class EditorActivity extends AppCompatActivity {
         sbTriggerHeight.setProgress(config.getTriggerHeight());
         tvTriggerHeight.setText("Height: " + config.getTriggerHeight() + "dp");
         
-        tvTriggerRadius = findViewById(R.id.tvTriggerRadius);
-        sbTriggerRadius = findViewById(R.id.sbTriggerRadius);
-        sbTriggerRadius.setProgress(config.getTriggerRadius());
-        tvTriggerRadius.setText("Corner Radius: " + config.getTriggerRadius() + "dp");
+        sbRadiusTL = findViewById(R.id.sbRadiusTL);
+        sbRadiusTR = findViewById(R.id.sbRadiusTR);
+        sbRadiusBL = findViewById(R.id.sbRadiusBL);
+        sbRadiusBR = findViewById(R.id.sbRadiusBR);
+        
+        sbRadiusTL.setProgress(config.getRadiusTL());
+        sbRadiusTR.setProgress(config.getRadiusTR());
+        sbRadiusBL.setProgress(config.getRadiusBL());
+        sbRadiusBR.setProgress(config.getRadiusBR());
         
         viewTriggerColorPreview = findViewById(R.id.viewTriggerColorPreview);
         previewTrigger = findViewById(R.id.previewTrigger);
@@ -144,8 +152,9 @@ public class EditorActivity extends AppCompatActivity {
     private void updatePreview() {
         if (previewTrigger == null) return;
         
-        int w = (int) (config.getTriggerWidth() * getResources().getDisplayMetrics().density);
-        int h = (int) (config.getTriggerHeight() * getResources().getDisplayMetrics().density);
+        float d = getResources().getDisplayMetrics().density;
+        int w = (int) (config.getTriggerWidth() * d);
+        int h = (int) (config.getTriggerHeight() * d);
         
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) previewTrigger.getLayoutParams();
         lp.width = w;
@@ -154,7 +163,15 @@ public class EditorActivity extends AppCompatActivity {
         
         GradientDrawable shape = new GradientDrawable();
         shape.setShape(GradientDrawable.RECTANGLE);
-        shape.setCornerRadius(config.getTriggerRadius() * getResources().getDisplayMetrics().density);
+        
+        // Set individual corner radii: TL, TR, BR, BL (each pair X/Y)
+        float[] radii = new float[] {
+            config.getRadiusTL() * d, config.getRadiusTL() * d,
+            config.getRadiusTR() * d, config.getRadiusTR() * d,
+            config.getRadiusBR() * d, config.getRadiusBR() * d,
+            config.getRadiusBL() * d, config.getRadiusBL() * d
+        };
+        shape.setCornerRadii(radii);
         
         int color = config.getTriggerColor();
         int style = config.getTriggerStyle();
@@ -218,11 +235,18 @@ public class EditorActivity extends AppCompatActivity {
             updatePreview();
         }));
         
-        sbTriggerRadius.setOnSeekBarChangeListener(new SimpleSeekBarListener(val -> {
-            config.setTriggerRadius(val);
-            tvTriggerRadius.setText("Corner Radius: " + val + "dp");
-            updatePreview();
-        }));
+        SimpleSeekBarListener radiusListener = new SimpleSeekBarListener(val -> {
+             config.setRadiusTL(sbRadiusTL.getProgress());
+             config.setRadiusTR(sbRadiusTR.getProgress());
+             config.setRadiusBL(sbRadiusBL.getProgress());
+             config.setRadiusBR(sbRadiusBR.getProgress());
+             updatePreview();
+        });
+        
+        sbRadiusTL.setOnSeekBarChangeListener(radiusListener);
+        sbRadiusTR.setOnSeekBarChangeListener(radiusListener);
+        sbRadiusBL.setOnSeekBarChangeListener(radiusListener);
+        sbRadiusBR.setOnSeekBarChangeListener(radiusListener);
         
         findViewById(R.id.btnPickColor).setOnClickListener(v -> showColorWheelDialog());
         
@@ -345,6 +369,14 @@ public class EditorActivity extends AppCompatActivity {
         List<ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
         List<AppInfoWrapper> validApps = new ArrayList<>();
         
+        // Collect existing package names to prevent duplicates
+        Set<String> existingPackages = new HashSet<>();
+        for (ShortcutItem item : config.getItems()) {
+            if (item.getType() == ShortcutItem.TYPE_APP && item.getPackageName() != null) {
+                existingPackages.add(item.getPackageName());
+            }
+        }
+        
         for (ApplicationInfo app : apps) {
             if (pm.getLaunchIntentForPackage(app.packageName) != null) {
                 validApps.add(new AppInfoWrapper(app, pm));
@@ -357,16 +389,11 @@ public class EditorActivity extends AppCompatActivity {
         RecyclerView rv = dialogView.findViewById(R.id.recyclerApps);
         EditText etSearch = dialogView.findViewById(R.id.etSearch);
         
-        // Change to Grid Layout with 6 columns
         rv.setLayoutManager(new GridLayoutManager(this, 6));
         
-        AppPickerAdapter adapter = new AppPickerAdapter(validApps, editingItem != null, pm);
-        if (editingItem != null) {
-            // Find current item to check it? Can be added later if needed.
-        }
+        AppPickerAdapter adapter = new AppPickerAdapter(validApps, editingItem != null, pm, existingPackages);
         rv.setAdapter(adapter);
         
-        // Search Logic
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -385,8 +412,23 @@ public class EditorActivity extends AppCompatActivity {
         dialog.setOnShowListener(d -> {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
                 List<AppInfoWrapper> selected = adapter.getSelected();
-                if (selected.isEmpty()) {
-                    Toast.makeText(this, "Please select at least one app", Toast.LENGTH_SHORT).show();
+                
+                // Filter out already existing apps just in case, though UI should handle it
+                List<AppInfoWrapper> newApps = new ArrayList<>();
+                for (AppInfoWrapper app : selected) {
+                    if (!existingPackages.contains(app.info.packageName)) {
+                         newApps.add(app);
+                    }
+                }
+                
+                if (newApps.isEmpty()) {
+                    // Check if it was empty because they selected nothing, or only selected duplicates
+                    if (selected.isEmpty()) {
+                         Toast.makeText(this, "Please select at least one app", Toast.LENGTH_SHORT).show();
+                    } else {
+                         // Only selected existing items, just close
+                         dialog.dismiss();
+                    }
                     return;
                 }
                 
@@ -394,13 +436,13 @@ public class EditorActivity extends AppCompatActivity {
                 
                 if (editingItem != null) {
                     // Single edit
-                    AppInfoWrapper app = selected.get(0);
+                    AppInfoWrapper app = newApps.get(0);
                     editingItem.setLabel(app.label);
                     editingItem.setPackageName(app.info.packageName);
                     itemAdapter.notifyDataSetChanged();
                 } else {
                     // Multi add
-                    processSelectedApps(selected);
+                    processSelectedApps(newApps);
                 }
             });
         });
@@ -547,13 +589,15 @@ public class EditorActivity extends AppCompatActivity {
         List<AppInfoWrapper> displayList;
         boolean singleSelection;
         PackageManager pm;
+        Set<String> existingPackages;
         List<AppInfoWrapper> selected = new ArrayList<>();
         
-        AppPickerAdapter(List<AppInfoWrapper> list, boolean singleSelection, PackageManager pm) {
+        AppPickerAdapter(List<AppInfoWrapper> list, boolean singleSelection, PackageManager pm, Set<String> existingPackages) {
             this.originalList = list;
             this.displayList = new ArrayList<>(list);
             this.singleSelection = singleSelection;
             this.pm = pm;
+            this.existingPackages = existingPackages != null ? existingPackages : new HashSet<>();
         }
         
         List<AppInfoWrapper> getSelected() { return selected; }
@@ -582,10 +626,24 @@ public class EditorActivity extends AppCompatActivity {
             holder.tv.setText(item.label);
             holder.icon.setImageDrawable(item.info.loadIcon(pm));
             
+            boolean exists = existingPackages.contains(item.info.packageName);
             boolean isSelected = selected.contains(item);
-            holder.cb.setChecked(isSelected);
+            
+            if (exists) {
+                holder.cb.setChecked(true);
+                holder.itemView.setAlpha(0.5f);
+                holder.itemView.setEnabled(false);
+                holder.cb.setEnabled(false);
+            } else {
+                holder.cb.setChecked(isSelected);
+                holder.itemView.setAlpha(1.0f);
+                holder.itemView.setEnabled(true);
+                holder.cb.setEnabled(false); // Checkbox is visual, click triggers item click
+            }
             
             holder.itemView.setOnClickListener(v -> {
+                if (exists) return; // Should not happen due to setEnabled(false) but safe guard
+                
                 if (singleSelection) {
                     selected.clear();
                     selected.add(item);
@@ -596,8 +654,6 @@ public class EditorActivity extends AppCompatActivity {
                     notifyItemChanged(position);
                 }
             });
-            // Also toggle on checkbox click
-            holder.cb.setOnClickListener(v -> holder.itemView.performClick());
         }
         
         @Override public int getItemCount() { return displayList.size(); }

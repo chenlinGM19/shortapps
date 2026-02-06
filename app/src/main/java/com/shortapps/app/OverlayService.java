@@ -13,6 +13,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
@@ -56,12 +57,13 @@ public class OverlayService extends Service {
     private Map<String, View> activeWindows = new HashMap<>();
     private List<WindowConfig> configs;
     private int screenWidth;
+    private int screenHeight;
 
     @Override
     public void onCreate() {
         super.onCreate();
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        screenWidth = getResources().getDisplayMetrics().widthPixels;
+        updateScreenDimensions();
         configs = ConfigManager.loadWindows(this);
         startForeground(1001, createNotification());
         refreshTriggers();
@@ -71,6 +73,53 @@ public class OverlayService extends Service {
         filter.addAction(ACTION_SHOW_WINDOW);
         filter.addAction(ACTION_HIDE_WINDOW);
         registerReceiver(internalReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+    }
+    
+    private void updateScreenDimensions() {
+        screenWidth = getResources().getDisplayMetrics().widthPixels;
+        screenHeight = getResources().getDisplayMetrics().heightPixels;
+    }
+    
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        int oldWidth = screenWidth;
+        updateScreenDimensions();
+        
+        // Reposition triggers based on edge snapping logic
+        for (String id : triggerParamsMap.keySet()) {
+            WindowManager.LayoutParams params = triggerParamsMap.get(id);
+            View view = activeTriggers.get(id);
+            
+            if (params != null && view != null) {
+                // If it was on the right half, snap to new right edge.
+                // If it was on left half, snap to new left edge (0).
+                if (params.x > oldWidth / 2) {
+                     params.x = screenWidth - view.getWidth();
+                } else {
+                     params.x = 0;
+                }
+                
+                // Ensure Y is within bounds
+                if (params.y > screenHeight - view.getHeight()) {
+                    params.y = screenHeight - view.getHeight();
+                }
+                
+                try {
+                    windowManager.updateViewLayout(view, params);
+                    // Update config persistence handled by drag listener, but we should probably update memory
+                    // Finding the config object:
+                    for (WindowConfig c : configs) {
+                        if (c.getId().equals(id)) {
+                            c.setTriggerX(params.x);
+                            c.setTriggerY(params.y);
+                            break;
+                        }
+                    }
+                } catch (Exception e) {}
+            }
+        }
+        ConfigManager.saveWindows(this, configs);
     }
     
     private final BroadcastReceiver internalReceiver = new BroadcastReceiver() {
@@ -135,14 +184,22 @@ public class OverlayService extends Service {
     }
     
     private void addTrigger(WindowConfig config) {
-        int widthPx = (int) (config.getTriggerWidth() * getResources().getDisplayMetrics().density);
-        int heightPx = (int) (config.getTriggerHeight() * getResources().getDisplayMetrics().density);
-        int radiusPx = (int) (config.getTriggerRadius() * getResources().getDisplayMetrics().density);
+        float d = getResources().getDisplayMetrics().density;
+        int widthPx = (int) (config.getTriggerWidth() * d);
+        int heightPx = (int) (config.getTriggerHeight() * d);
         
         View trigger = new View(this);
         GradientDrawable shape = new GradientDrawable();
         shape.setShape(GradientDrawable.RECTANGLE);
-        shape.setCornerRadius(radiusPx);
+        
+        // 4 radii: TL, TR, BR, BL
+        float[] radii = new float[] {
+            config.getRadiusTL() * d, config.getRadiusTL() * d,
+            config.getRadiusTR() * d, config.getRadiusTR() * d,
+            config.getRadiusBR() * d, config.getRadiusBR() * d,
+            config.getRadiusBL() * d, config.getRadiusBL() * d
+        };
+        shape.setCornerRadii(radii);
         
         int color = config.getTriggerColor();
         int style = config.getTriggerStyle();
@@ -353,7 +410,6 @@ public class OverlayService extends Service {
                 int pad = 8;
                 root.setPadding(pad, pad, pad, pad);
                 
-                // This wrapper ensures 1:1 ratio for the visual part (Icon or Block)
                 contentWrapper = new SquareFrameLayout(OverlayService.this);
                 FrameLayout.LayoutParams wrapperParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                 wrapperParams.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
@@ -373,13 +429,7 @@ public class OverlayService extends Service {
                 label.setMaxLines(1);
                 label.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 
-                // Label is positioned below the square wrapper, but we need to ensure layout handles it.
-                // Since wrapper is square based on width, we can't easily rely on margins from top.
-                // Instead, we put label in root, and rely on wrapper pushing it down?
-                // Actually, since contentWrapper is MATCH_PARENT width, and square, its height depends on cell width.
-                // We need a LinearLayout in root to stack them properly.
-                
-                root.removeView(contentWrapper); // re-add inside linear
+                root.removeView(contentWrapper); 
                 
                 android.widget.LinearLayout linear = new android.widget.LinearLayout(OverlayService.this);
                 linear.setOrientation(android.widget.LinearLayout.VERTICAL);

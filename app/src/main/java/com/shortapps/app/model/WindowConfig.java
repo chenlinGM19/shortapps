@@ -22,14 +22,21 @@ public class WindowConfig {
     private boolean triggerEnabled;
     private int triggerWidth;  // dp
     private int triggerHeight; // dp
-    private int triggerRadius; // dp
+    
+    // Individual Corner Radii (dp)
+    private int radiusTL; 
+    private int radiusTR;
+    private int radiusBL;
+    private int radiusBR;
+    
     private int triggerColor;  // ARGB
     private int triggerStyle;  // 0: Solid, 1: Outline, 2: Glass, 3: Inverted
     private int triggerX;
     private int triggerY;
 
-    // Legacy support field
+    // Legacy support fields
     private int triggerSize; 
+    private int triggerRadius; // Kept for backward compatibility migration
 
     public WindowConfig(String name) {
         this.id = UUID.randomUUID().toString();
@@ -44,7 +51,13 @@ public class WindowConfig {
         this.triggerEnabled = true;
         this.triggerWidth = 60;
         this.triggerHeight = 60;
-        this.triggerRadius = 30;
+        
+        // Default rounded corners (pill shape logic handled in getters if needed, but defaults to 30)
+        this.radiusTL = 30;
+        this.radiusTR = 30;
+        this.radiusBL = 30;
+        this.radiusBR = 30;
+        
         this.triggerColor = Color.parseColor("#99000000"); // Transparent Black
         this.triggerStyle = 0;
         this.triggerX = 0;
@@ -83,8 +96,28 @@ public class WindowConfig {
     }
     public void setTriggerHeight(int triggerHeight) { this.triggerHeight = triggerHeight; }
     
+    // Radius Getters/Setters
+    public int getRadiusTL() { return radiusTL != 0 ? radiusTL : triggerRadius; }
+    public void setRadiusTL(int r) { this.radiusTL = r; }
+
+    public int getRadiusTR() { return radiusTR != 0 ? radiusTR : triggerRadius; }
+    public void setRadiusTR(int r) { this.radiusTR = r; }
+
+    public int getRadiusBL() { return radiusBL != 0 ? radiusBL : triggerRadius; }
+    public void setRadiusBL(int r) { this.radiusBL = r; }
+
+    public int getRadiusBR() { return radiusBR != 0 ? radiusBR : triggerRadius; }
+    public void setRadiusBR(int r) { this.radiusBR = r; }
+
+    // Legacy getter for bulk setting if needed, primarily used for migration
     public int getTriggerRadius() { return triggerRadius; }
-    public void setTriggerRadius(int triggerRadius) { this.triggerRadius = triggerRadius; }
+    public void setTriggerRadius(int triggerRadius) { 
+        this.triggerRadius = triggerRadius;
+        this.radiusTL = triggerRadius;
+        this.radiusTR = triggerRadius;
+        this.radiusBL = triggerRadius;
+        this.radiusBR = triggerRadius;
+    }
 
     public int getTriggerColor() { 
         return triggerColor != 0 ? triggerColor : Color.parseColor("#99000000");
