@@ -20,6 +20,8 @@ public class WindowConfig {
     
     // Trigger Button Settings
     private boolean triggerEnabled;
+    private boolean cornerSnap; // New field for Corner Snapping
+    private int cornerAnchor;   // 0:TL, 1:TR, 2:BL, 3:BR, -1:Unset
     private int triggerWidth;  // dp
     private int triggerHeight; // dp
     
@@ -49,6 +51,8 @@ public class WindowConfig {
         this.enabledInNotification = true;
         this.showLabels = true;
         this.triggerEnabled = true;
+        this.cornerSnap = false; 
+        this.cornerAnchor = -1; // Default unset
         this.triggerWidth = 60;
         this.triggerHeight = 60;
         
@@ -85,6 +89,12 @@ public class WindowConfig {
     
     public boolean isTriggerEnabled() { return triggerEnabled; }
     public void setTriggerEnabled(boolean triggerEnabled) { this.triggerEnabled = triggerEnabled; }
+    
+    public boolean isCornerSnap() { return cornerSnap; }
+    public void setCornerSnap(boolean cornerSnap) { this.cornerSnap = cornerSnap; }
+
+    public int getCornerAnchor() { return cornerAnchor; }
+    public void setCornerAnchor(int cornerAnchor) { this.cornerAnchor = cornerAnchor; }
     
     public int getTriggerWidth() { 
         return triggerWidth > 0 ? triggerWidth : (triggerSize > 0 ? triggerSize : 60); 

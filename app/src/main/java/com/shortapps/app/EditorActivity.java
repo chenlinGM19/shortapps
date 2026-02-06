@@ -57,7 +57,7 @@ public class EditorActivity extends AppCompatActivity {
     
     private EditText etName;
     private View viewTriggerColorPreview, previewTrigger;
-    private SwitchMaterial switchNotification, switchTrigger, switchShowLabels;
+    private SwitchMaterial switchNotification, switchTrigger, switchShowLabels, switchCornerSnap;
     private SeekBar sbColumns, sbTriggerWidth, sbTriggerHeight;
     private SeekBar sbRadiusTL, sbRadiusTR, sbRadiusBL, sbRadiusBR;
     private TextView tvColumns, tvTriggerWidth, tvTriggerHeight;
@@ -109,6 +109,9 @@ public class EditorActivity extends AppCompatActivity {
         
         layoutTriggerSettings = findViewById(R.id.layoutTriggerSettings);
         layoutTriggerSettings.setVisibility(config.isTriggerEnabled() ? View.VISIBLE : View.GONE);
+        
+        switchCornerSnap = findViewById(R.id.switchCornerSnap);
+        switchCornerSnap.setChecked(config.isCornerSnap());
         
         toggleTriggerStyle = findViewById(R.id.toggleTriggerStyle);
         int styleId = R.id.btnStyle0;
@@ -212,6 +215,8 @@ public class EditorActivity extends AppCompatActivity {
             config.setTriggerEnabled(checked);
             layoutTriggerSettings.setVisibility(checked ? View.VISIBLE : View.GONE);
         });
+
+        switchCornerSnap.setOnCheckedChangeListener((btn, checked) -> config.setCornerSnap(checked));
         
         toggleTriggerStyle.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
             if (isChecked) {

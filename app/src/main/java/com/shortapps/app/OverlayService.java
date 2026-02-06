@@ -92,29 +92,57 @@ public class OverlayService extends Service {
             View view = activeTriggers.get(id);
             
             if (params != null && view != null) {
-                // If it was on the right half, snap to new right edge.
-                // If it was on left half, snap to new left edge (0).
-                if (params.x > oldWidth / 2) {
-                     params.x = screenWidth - view.getWidth();
-                } else {
-                     params.x = 0;
-                }
+                // Determine snap logic based on config
+                WindowConfig c = null;
+                for(WindowConfig wc : configs) { if(wc.getId().equals(id)) { c=wc; break; } }
                 
-                // Ensure Y is within bounds
-                if (params.y > screenHeight - view.getHeight()) {
-                    params.y = screenHeight - view.getHeight();
+                if (c != null && c.isCornerSnap()) {
+                     int anchor = c.getCornerAnchor();
+                     // 0: TL, 1: TR, 2: BL, 3: BR
+                     if (anchor == -1) {
+                         // Fallback if anchor never set: calculate nearest based on old rel pos
+                         // but simpler to just default to nearest now
+                         snapToClosestCorner(params, view, c, false); // Snap immediately without anim update config only
+                     } else {
+                         // Force position based on anchor and NEW screen dimensions
+                         switch (anchor) {
+                             case 0: // TL
+                                 params.x = 0; 
+                                 params.y = 0; 
+                                 break;
+                             case 1: // TR
+                                 params.x = screenWidth - view.getWidth(); 
+                                 params.y = 0; 
+                                 break;
+                             case 2: // BL
+                                 params.x = 0; 
+                                 params.y = screenHeight - view.getHeight(); 
+                                 break;
+                             case 3: // BR
+                                 params.x = screenWidth - view.getWidth(); 
+                                 params.y = screenHeight - view.getHeight(); 
+                                 break;
+                         }
+                     }
+                } else {
+                    // Vertical Edge Logic
+                    if (params.x > oldWidth / 2) {
+                         params.x = screenWidth - view.getWidth();
+                    } else {
+                         params.x = 0;
+                    }
+                    
+                    // Clamp Y
+                    if (params.y > screenHeight - view.getHeight()) {
+                        params.y = screenHeight - view.getHeight();
+                    }
                 }
                 
                 try {
                     windowManager.updateViewLayout(view, params);
-                    // Update config persistence handled by drag listener, but we should probably update memory
-                    // Finding the config object:
-                    for (WindowConfig c : configs) {
-                        if (c.getId().equals(id)) {
-                            c.setTriggerX(params.x);
-                            c.setTriggerY(params.y);
-                            break;
-                        }
+                    if (c != null) {
+                        c.setTriggerX(params.x);
+                        c.setTriggerY(params.y);
                     }
                 } catch (Exception e) {}
             }
@@ -274,32 +302,109 @@ public class OverlayService extends Service {
                 case MotionEvent.ACTION_UP:
                     view.animate().scaleX(1f).scaleY(1f).setDuration(100).start();
                     if (!isDrag) toggleWindow(config);
-                    else snapToEdge(params, view, config);
+                    else snapToDestination(params, view, config);
                     return true;
             }
             return false;
         }
     }
     
-    private void snapToEdge(WindowManager.LayoutParams params, View view, WindowConfig config) {
+    private void snapToDestination(WindowManager.LayoutParams params, View view, WindowConfig config) {
+        if (config.isCornerSnap()) {
+            snapToClosestCorner(params, view, config, true);
+        } else {
+            snapToVerticalEdge(params, view, config);
+        }
+    }
+
+    private void snapToClosestCorner(WindowManager.LayoutParams params, View view, WindowConfig config, boolean animate) {
+        int w = view.getWidth();
+        int h = view.getHeight();
+        int currentX = params.x;
+        int currentY = params.y;
+
+        // Define Corners
+        // 0: TL (0,0)
+        // 1: TR (screenWidth-w, 0)
+        // 2: BL (0, screenHeight-h)
+        // 3: BR (screenWidth-w, screenHeight-h)
+
+        int[] xTargets = {0, screenWidth - w, 0, screenWidth - w};
+        int[] yTargets = {0, 0, screenHeight - h, screenHeight - h};
+        
+        int bestIdx = 0;
+        double minDesc = Double.MAX_VALUE;
+        
+        for (int i=0; i<4; i++) {
+            double dist = Math.pow(currentX - xTargets[i], 2) + Math.pow(currentY - yTargets[i], 2);
+            if (dist < minDesc) {
+                minDesc = dist;
+                bestIdx = i;
+            }
+        }
+        
+        // Save the anchor for rotation handling
+        config.setCornerAnchor(bestIdx);
+        
+        int targetX = xTargets[bestIdx];
+        int targetY = yTargets[bestIdx];
+        
+        if (animate) {
+            animateMove(params, view, config, targetX, targetY);
+        } else {
+            params.x = targetX;
+            params.y = targetY;
+            try { windowManager.updateViewLayout(view, params); } catch (Exception e) {}
+            config.setTriggerX(targetX);
+            config.setTriggerY(targetY);
+            // Anchor already set above
+        }
+    }
+    
+    private void snapToVerticalEdge(WindowManager.LayoutParams params, View view, WindowConfig config) {
         int mid = screenWidth / 2;
         int targetX = (params.x > mid) ? screenWidth - view.getWidth() : 0;
-        ValueAnimator anim = ValueAnimator.ofInt(params.x, targetX);
-        anim.setDuration(300);
-        anim.setInterpolator(new OvershootInterpolator());
-        anim.addUpdateListener(animation -> {
+        int targetY = params.y; // Keep Y as is
+        
+        // Clamp Y
+        if (targetY < 0) targetY = 0;
+        if (targetY > screenHeight - view.getHeight()) targetY = screenHeight - view.getHeight();
+        
+        animateMove(params, view, config, targetX, targetY);
+    }
+    
+    private void animateMove(WindowManager.LayoutParams params, View view, WindowConfig config, int targetX, int targetY) {
+        ValueAnimator animX = ValueAnimator.ofInt(params.x, targetX);
+        ValueAnimator animY = ValueAnimator.ofInt(params.y, targetY);
+        
+        animX.addUpdateListener(animation -> {
             params.x = (int) animation.getAnimatedValue();
+            // We update in one listener, but need latest Y from other animator? 
+            // Better to use a single animator update if possible or just update layout in both
             try { windowManager.updateViewLayout(view, params); } catch (Exception e) {}
         });
-        anim.addListener(new AnimatorListenerAdapter() {
+        
+        animY.addUpdateListener(animation -> {
+             params.y = (int) animation.getAnimatedValue();
+             try { windowManager.updateViewLayout(view, params); } catch (Exception e) {}
+        });
+        
+        AnimatorListenerAdapter endListener = new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
                 config.setTriggerX(params.x);
                 config.setTriggerY(params.y);
                 saveConfigState(); 
             }
-        });
-        anim.start();
+        };
+        
+        // Use an AnimatorSet to run them together
+        android.animation.AnimatorSet set = new android.animation.AnimatorSet();
+        set.playTogether(animX, animY);
+        set.setDuration(300);
+        set.setInterpolator(new OvershootInterpolator());
+        set.addListener(endListener);
+        set.start();
     }
     
     private void saveConfigState() {
